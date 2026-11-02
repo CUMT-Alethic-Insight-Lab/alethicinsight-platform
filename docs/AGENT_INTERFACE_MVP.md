@@ -155,7 +155,7 @@ python server/scripts/sync_org_knowledge.py --local-dir /path/to/reviewed/govern
 | 离机备份/隔离恢复 | 待演练 |
 | 生产发布/反代/TLS | 配置已入 PR，未执行生产部署、nginx reload 或线上验证 |
 
-本次文档检查（2026-11-02）：使用仓库根的临时内联 Python 检查根 README、本手册、两份边界/迁移文档及 `docs/agent-interface/` 的全部 Markdown，共 20 个文件、44 个本地链接目标均存在；旧命令、错误发行拼写与未实现命令示例检查通过，MCP JSON 包含与首次登录共用的隔离目录配置。`git diff --check` 通过。README 的子 shell 保持仓库根工作目录，考生端测试为 311 passed；本次后端执行出现凭据校验与 SQLite 缺表失败，不据此宣称全量通过，最终结果由主代理统一复核。本次未构建/安装单包、实测 Host 或部署生产，不修改此前历史测试结果。
+最终串行复核（2026-11-02）：文档共 20 个文件、44 个本地链接目标均存在，旧命令、错误发行拼写与未实现命令示例检查通过；`git diff --check`、前端 JS 语法检查通过。`cd server && python -m pytest -q` 为 **566 passed**，`cd exam_kit && python -m pytest -q` 为 **311 passed**。运行时与人工 OpenAPI 的 **22 个 operation** 对齐，当前 grant 自撤销具有 Bearer security 与响应模型。单发行 wheel 在干净临时环境安装后，两个正式入口均实际运行；默认 MCP 使用隔离模式，伪造同名模块未执行。Windows 最终 ACL 读取验证通过，POSIX 权限分支仅有 mock 覆盖。真实浏览器、真实 Agent Host、独立 POSIX 主机、目标硬件、备份恢复和生产发布仍未验证，未执行 nginx reload 或部署。
 
 ## 7. 备份与隔离恢复（人工操作方案）
 
