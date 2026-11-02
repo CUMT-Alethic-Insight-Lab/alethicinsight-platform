@@ -41,6 +41,10 @@ def test_member_registration_exam_upload_and_booking(
             token = data["token"]
     if session_kind == "exam_kit":
         token = applicant_login(client, cid, student)["token"]
+        with db.connection() as conn:
+            sess = auth.lookup_session(conn, token)
+            assert sess["kind"] == "member"
+            assert sess["campaign_id"] == cid
     headers = {"Authorization": f"Bearer {token}"}
     payload = _application(student)
     for _ in range(2):

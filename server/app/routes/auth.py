@@ -435,7 +435,8 @@ def applicant_login(cid: str, body: ApplicantLoginBody):
             "SELECT name FROM application WHERE campaign_id = ? AND student_id = ?",
             (cid, body.student_id),
         ).fetchone()
-        token = auth.issue_session(conn, "applicant", cid, body.student_id)
+        kind = "member" if acct["role"] == "member" else "applicant"
+        token = auth.issue_session(conn, kind, cid, body.student_id)
         return {
             "token": token,
             "student_id": body.student_id,

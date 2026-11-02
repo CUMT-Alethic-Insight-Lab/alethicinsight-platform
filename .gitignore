@@ -15,3 +15,5 @@ itv_tmp_*
 __pycache__/
 .pytest_cache/
 *.pyc
+build/
+*.egg-info/

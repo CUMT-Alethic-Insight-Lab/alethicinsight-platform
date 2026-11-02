@@ -1,0 +1,22 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "alethicinsight-cli"
+dynamic = ["version"]
+description = "Alethic Insight organization CLI and local stdio MCP interface"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = []
+
+[project.scripts]
+alethicinsight-cli = "alethicinsight_cli.cli:main"
+alethicinsight-mcp = "alethicinsight_mcp.__main__:main"
+
+[tool.setuptools.dynamic]
+version = {attr = "alethicinsight_cli.__version__"}
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["alethicinsight_cli*", "alethicinsight_mcp*"]

@@ -1,21 +1,21 @@
 # Recruitment Exam Platform · 招新机试服务端
 
-中国矿业大学 **Alethic Insight** 实验室的招新平台服务端：FastAPI + SQLite + 原生 HTML/JS 管理端。负责报名、账号、问卷、面试评审、题库抽题、交卷暂存转发、服务端报告重建与归档。
+中国矿业大学 **Alethic Insight** 实验室的招新平台服务端：FastAPI + SQLite + 原生 HTML/JS 管理端。负责报名、账号、问卷、面试评审、题库抽题、交卷暂存转发、服务端报告重建与归档，以及组织知识与成员事务接口。
 
-This repository owns the recruitment backend and admin console. The candidate exam kit is maintained separately in [recruitment-exam-kit](https://github.com/CUMT-Alethic-Insight-Lab/recruitment-exam-kit).
+This repository owns the recruitment backend, admin console and organization interfaces. The candidate exam kit is maintained separately in [recruitment-exam-kit](https://github.com/CUMT-Alethic-Insight-Lab/recruitment-exam-kit).
 
 ## 职责与仓库边界
 
 | 位置 | 职责与权威来源 |
 | --- | --- |
-| `server/` | 平台 API、数据库迁移、管理页面及服务端测试；运行行为以本仓实现和测试为准 |
+| `server/` | 平台 API、数据库迁移、管理页面、组织接口及服务端测试；运行行为以本仓实现和测试为准 |
 | `server/app/cleaned_report.py` | 将已上传的 `cleaned.jsonl` 重建为供评审下载的 Markdown |
 | `server/deploy/` | 服务端部署脚本和模板；真实环境参数只在私有运维记录中维护 |
-| `docs/` | 流程及历史方案；设计草案不代表已实现或已部署的功能 |
+| `docs/` | 流程、实现手册及历史方案；设计草案不代表已实现或已部署的功能 |
 | [recruitment-exam-kit](https://github.com/CUMT-Alethic-Insight-Lab/recruitment-exam-kit) | 考生端启动器、本地机试服务、会话清洗、LAN 接收机及安装器的唯一源码权威；不再位于本仓 `exam_kit/` |
-| [infra/interface/alethicinsight-cli](https://github.com/CUMT-Alethic-Insight-Lab/recruitment-exam-platform/tree/main/infra/interface/alethicinsight-cli) | 公共 CLI 接口归属本平台的 infra 接口项目；本次移除 PR 不引入接口实现，不另拆 MCP 仓库 |
+| [infra/interface/alethicinsight-cli](infra/interface/alethicinsight-cli/README.md) | 同一 `alethicinsight-cli` 发行包/版本，提供 CLI 与本地 stdio MCP 两个入口；只读与草稿，最终提交在可信网页完成，不另拆 MCP 仓库 |
 
-接口目录由独立迁移维护，本 PR 的基线 `c97b980` 尚未包含 `infra/`；上述链接指向平台主线的目标归属，不是本分支内已经落地的文件。`docs/agent-interface/` 保留为接口设计资料，不能替代实现与契约测试。
+PR #3 已将公共接口实现与组织接口合入平台 main（`d06f26d`）；本分支合并该基线并保留整个 `infra/` 和组织接口。`docs/agent-interface/` 为设计与契约资料，实际入口及验证边界见 [MVP 手册](docs/AGENT_INTERFACE_MVP.md)。
 
 本仓不维护考生端安装包构建，也不接管官网独立仓或前端模板仓。
 
@@ -25,14 +25,12 @@ This repository owns the recruitment backend and admin console. The candidate ex
 
 ## 本地构建与测试
 
-服务端没有额外前端编译步骤。建议使用隔离的 Python 环境：
+服务端没有额外前端编译步骤。建议使用隔离的 Python 环境；激活后从仓库根连续执行，括号中的子 shell 不改变当前终端目录：
 
 ```bash
 python -m venv .venv
-# 激活 .venv 后，在仓库根目录执行
-python -m pip install -r server/requirements.txt
-cd server
-python -m pytest tests -q
+# 激活 .venv 后执行
+(cd server && python -m pip install -r requirements.txt && python -m pytest tests -q)
 ```
 
 页面 JavaScript 的回归测试需要 Node.js；没有 Node.js 时相关用例会跳过，完整验证应安装 Node.js 后运行全量测试。测试使用合成夹具与测试数据库，不需要生产凭据或成员数据。
@@ -59,10 +57,10 @@ python -m pytest tests -q
 
 ## 分仓迁移与回滚
 
-- 从平台 `origin/main` 的 `c97b980` 创建独立移除分支；只删除该版本中 Git 跟踪的 `exam_kit/`，不删除旧本地目录、不搬走未提交文件，也不改写既有历史。
-- 新开发者分别克隆平台与 [exam-kit](https://github.com/CUMT-Alethic-Insight-Lab/recruitment-exam-kit)，不要继续把套件代码提交回平台。
+- 从平台 `origin/main` 的 `c97b980` 创建独立移除分支，再合并 PR #3 后的 main `d06f26d`；只移除 Git 跟踪的 `exam_kit/`，保留公共接口及组织接口，不改写既有历史，不覆盖不同 HEAD 的工作副本。
+- 新公共 [exam-kit](https://github.com/CUMT-Alethic-Insight-Lab/recruitment-exam-kit) 和私有 [recruitment-materials](https://github.com/CUMT-Alethic-Insight-Lab/recruitment-materials) 已发布，各有 README。分别克隆，不再把套件代码提交回平台；本 PR 不修改新 kit 仓。
 - `push-server.sh` 只打包服务端；`push-lab.sh` 仍部署服务端和 LAN 接收机，但必须用 `EXAM_KIT_DIR` 显式指定经过兼容验证的独立套件检出目录，详见部署说明。缺少接收机源码时应在联网操作前失败。
-- 本 PR 不迁移数据库、安装包对象、私有运行配置或归档数据，不更改运行中服务。
+- 本 PR 不迁移数据库、安装包对象、私有运行配置或归档数据，不更改运行中服务；源码/测试验证不代表完整安装器已重建或跨仓生产兼容已验收。
 - 源码回滚：通过新 PR revert 本次移除提交（不 reset/clean 旧工作区）；独立套件仓和既有本地文件仍保留。运行版本回滚：按部署说明恢复上一服务端 release，接收机单独恢复之前记录的套件版本；需要时同步恢复匹配的 OTA 元数据，不能盲目降级数据库。
 
 ## 架构
@@ -88,10 +86,29 @@ python -m pytest tests -q
 | 私有仓 | 内容 |
 | --- | --- |
 | `question-bank` | 真实机试题库与解析校验；本仓 `server/tests/fixtures/` 仅为合成夹具 |
-| `infra-handoff` | 真实主机地址、账号、密钥路径与运维记录；公开部署说明仅为模板 |
+| `infra-handoff` | 私有运维交接：真实主机地址、账号、密钥路径与运维记录；不承载公共 CLI/MCP 源码 |
 | `exam-archive` | 考生清洗件、仓库链接与附件 |
+| `recruitment-materials` | 受控招新物料；原始私有材料不因分仓而公开 |
 
 本地 `data/`、运行时配置、密钥、测试输出及未提交内容不作为分仓提交来源。服务端行为以本仓代码/测试为准，客户端以独立套件仓为准，发布产物以对应发布记录和哈希为准。
+
+## Public Interface · 公共接口
+
+CLI 与 MCP 同属 infra，单仓单发行包单版本；在本地 Python 3.10+ venv 从仓库根安装：
+
+```sh
+python -m pip install ./infra/interface/alethicinsight-cli
+alethicinsight-cli --help
+alethicinsight-mcp --help
+```
+
+新客户端配置使用 `ALETHICINSIGHT_API_BASE_URL`（服务根，不含 `/api/v1`）与 `ALETHICINSIGHT_CONFIG_DIR`；旧 `ALETHIC_API_BASE_URL`、`ALETHIC_BASE_URL`、`ALETHIC_CONFIG_DIR` 仅为兼容别名。授权 API `/auth/cli/*` 不随发行名改动。最终提交只能由用户在可信网页确认，MCP 不提供审批或正式提交工具。
+
+- [本地 MVP 手册](docs/AGENT_INTERFACE_MVP.md)
+- [仓库职责与公开边界](docs/REPOSITORY_BOUNDARIES.md)
+- [工作区保全与迁移清单](docs/WORKSPACE_MIGRATION.md)
+
+`Alethic-Insight-Frontend-Templates` 不在此次整理范围；不新建 MCP 仓，不部署生产，不读取秘密正文，不覆盖不同 HEAD 的副本。工作区迁移清单保留为历史流程参考，不是本 PR 的业务验收记录。
 
 ## 相关仓库
 
