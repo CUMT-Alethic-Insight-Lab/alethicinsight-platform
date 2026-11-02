@@ -48,24 +48,26 @@ authoritative/edge 必须保持单一权威：旧 edge 机试暂存转发只适�
 
 ## 3. CLI 安装与登录
 
-需要 Python 3.10+；从仓库根，在本地 venv 安装独立客户端：
+需要 Python 3.10+；从仓库根，在本地 venv 安装 infra 公共接口单包。发行名 `alethicinsight-cli`，CLI 与 MCP 单仓、单版本，同一次安装提供两个入口：
 
 ```sh
-python -m pip install ./cli
-export ALETHIC_API_BASE_URL=http://127.0.0.1:8901
-alethic --help
-alethic auth login
-alethic auth status --json
-alethic projects list --recruiting --limit 20 --json
-alethic knowledge search '成员' --json
-alethic forms schema project-join --json
-alethic applications list --mine --limit 20 --json
+python -m pip install ./infra/interface/alethicinsight-cli
+export ALETHICINSIGHT_API_BASE_URL=http://127.0.0.1:8901
+alethicinsight-cli --help
+alethicinsight-cli auth login
+alethicinsight-cli auth status --json
+alethicinsight-cli projects list --recruiting --limit 20 --json
+alethicinsight-cli knowledge search '成员' --json
+alethicinsight-cli forms schema project-join --json
+alethicinsight-cli applications list --mine --limit 20 --json
 ```
 
-参见 [CLI 自带说明](../cli/README.md)。CLI 生成随机 request_id，打开可信 `/org?cli_request=...`，用户在网页核对 scopes 后取一次性 code，并在 CLI 隐藏输入提示中输入。不得向 Agent 粘贴网页 token、密码、code、CLI token 或确认 token。默认 scopes 只读；要准备草稿需重新明确授权 `applications:create`，例如：
+新配置使用 `ALETHICINSIGHT_API_BASE_URL` 与 `ALETHICINSIGHT_CONFIG_DIR`；旧 `ALETHIC_API_BASE_URL`、`ALETHIC_BASE_URL`、`ALETHIC_CONFIG_DIR` 仅为兼容别名，不再作为推荐配置。服务端第 2 节的 `ALE_THIC_*` 配置不在客户端重命名范围内。API `/auth/cli/*` 路由保持不变。
+
+参见 [CLI/MCP 说明](agent-interface/docs/05-cli-mcp-skills.md)与[仓库边界](REPOSITORY_BOUNDARIES.md)。CLI 生成随机 request_id，打开可信 `/org?cli_request=...`，用户在网页核对 scopes 后取一次性 code，并在 CLI 隐藏输入提示中输入。不得向 Agent 粘贴网页 token、密码、code、CLI token 或确认 token。默认 scopes 只读；要准备草稿需重新明确授权 `applications:create`，例如：
 
 ```sh
-alethic auth login --scope profile:read:self --scope applications:create --scope applications:read:self --scope projects:read
+alethicinsight-cli auth login --scope profile:read:self --scope applications:create --scope applications:read:self --scope projects:read
 ```
 
 先读表单，再准备本地脱敏 JSON（project_id 与 revision 以实际接口为准）：
@@ -75,21 +77,20 @@ alethic auth login --scope profile:read:self --scope applications:create --scope
 ```
 
 ```sh
-alethic applications submit --file application.json --dry-run --json
-alethic applications draft --file application.json --json
+alethicinsight-cli applications submit --file application.json --dry-run --json
+alethicinsight-cli applications draft --file application.json --json
 ```
 
 `--dry-run` 只服务端 validate；draft 持久化但不提交。CLI 的 `applications submit` 也只准备草稿并返回需要可信网页确认（退出码 7），没有 `--confirm`、最终提交或 review。用户必须在 `/org?draft_id=...` 重新核对并确认，网页才取得短时 token 并提交。REST 最终提交 body 是 `draft_id + confirmation` 字符串，不是 `fields` 或旧版嵌套 `confirmation_token`。
 
-分页只取一页，下一页传 `--cursor`，CLI 页大小目前为 1..50。JSON 输出与日志分离；错误退出码见 CLI 说明。`auth logout` 清理本地凭据，不等于服务端撤销；应到可信网页撤销 grant，或等待过期。凭据默认位于 Windows `%LOCALAPPDATA%/Alethic/credentials.json` 或 POSIX `~/.config/alethic/credentials.json`（可受 XDG 配置影响）；不要读取/复制该文件，不放入代码库、共享目录或备份。
+分页只取一页，下一页传 `--cursor`，CLI 页大小目前为 1..50。JSON 输出与日志分离；错误退出码见 CLI 说明。`auth logout` 尝试通过 `DELETE /auth/cli/grants/self` 撤销当前 grant，并清理本地凭据；以 `server_revoked` 判断是否确认完成服务端撤销，未确认时到可信网页撤销或等待过期。本地凭据存储及兼容迁移以单包说明为准；隔离演练使用 `ALETHICINSIGHT_CONFIG_DIR` 指向新建的私有临时目录，不读取或复制已有凭据文件，不放入代码库、共享目录或备份。
 
-## 4. 本地 stdio MCP 安装
+## 4. 本地 stdio MCP 入口
 
-在已安装 CLI、完成授权的同一用户环境：
+第 3 节单包安装已经提供 MCP，不需要再安装第二个发行包。在同一用户完成 CLI 授权后检查：
 
 ```sh
-python -m pip install ./mcp_adapter
-alethic-mcp --help
+alethicinsight-mcp --help
 ```
 
 MCP Host 的本地 stdio 配置示例（实际配置文件结构取决于 Host；路径需换为本地 venv 的绝对路径）：
@@ -97,18 +98,18 @@ MCP Host 的本地 stdio 配置示例（实际配置文件结构取决于 Host�
 ```json
 {
   "mcpServers": {
-    "alethic": {
-      "command": "/absolute/path/to/venv/bin/alethic-mcp",
-      "args": ["--cli", "/absolute/path/to/venv/bin/alethic"],
-      "env": {"ALETHIC_API_BASE_URL": "http://127.0.0.1:8901"}
+    "alethicinsight": {
+      "command": "/absolute/path/to/venv/bin/alethicinsight-mcp",
+      "args": ["--cli", "/absolute/path/to/venv/bin/alethicinsight-cli"],
+      "env": {"ALETHICINSIGHT_API_BASE_URL": "http://127.0.0.1:8901"}
     }
   }
 }
 ```
 
-Windows 对应 `Scripts/alethic-mcp.exe` 和 `Scripts/alethic.exe`。这里不在环境参数写 token；适配器通过同一用户 CLI 凭据调用 API。不要将非可信程序或 shell 字符串作为 `--cli`。不要把它启动为远程 HTTP 服务；stdio 的 stdout 专供 JSON-RPC，不手工混入日志。工具只允许发现/读取和准备待网页确认草稿，不包含确认签发、最终提交、review、SQL、shell 或任意 URL 抓取。
+Windows 对应 `Scripts/alethicinsight-mcp.exe` 和 `Scripts/alethicinsight-cli.exe`。这里不在环境参数写 token；适配器通过同一用户 CLI 凭据调用 API。不要将非可信程序或 shell 字符串作为 `--cli`。不要把它启动为远程 HTTP 服务；stdio 的 stdout 专供 JSON-RPC，不手工混入日志。工具只允许发现/读取和准备待网页确认草稿，不包含确认签发、最终提交、review、SQL、shell 或任意 URL 抓取。
 
-本地协议自动测试不等于实际 MCP Host 接入成功，也不代表 MCP 所有版本均兼容。支持版本和参数以 `mcp_adapter/alethic_mcp/server.py`、`--help` 及实际握手为准；真实客户端名称/版本/结果需另行记录。
+本地协议自动测试不等于实际 MCP Host 接入成功，也不代表 MCP 所有版本均兼容。支持版本和参数以 `infra/interface/alethicinsight-cli/` 内的实现、`--help` 及实际握手为准；真实客户端名称/版本/结果需另行记录。
 
 ## 5. 受控知识同步
 
@@ -134,7 +135,7 @@ python server/scripts/sync_org_knowledge.py --local-dir /path/to/reviewed/govern
 
 标准后端命令从 `server/` 运行 `python -m pytest -q`；新增模块测试使用 `test_m31` 以后的独立文件。先运行针对性测试，再由主代理执行全量。文档模块使用 YAML 解析、内部 `$ref`、operationId/路径参数和本地 Markdown 链接检查；正式发布前再与应用生成的 `/openapi.json` 比较。
 
-实际记录（2026-10-27）：
+历史记录（2026-10-27，保留原结果，不代表本次单包重构的验证；当前全量结果由主代理最终更新）：
 
 | 证据 | 状态/命令/结果 |
 |---|---|
@@ -146,6 +147,8 @@ python server/scripts/sync_org_knowledge.py --local-dir /path/to/reviewed/govern
 | 目标硬件与容量 | 待测量 |
 | 离机备份/隔离恢复 | 待演练 |
 | 生产发布/反代/TLS | 配置已入 PR，未执行生产部署、nginx reload 或线上验证 |
+
+本次文档检查（2026-11-02）：使用仓库根的临时内联 Python 检查根 README、本手册、两份边界/迁移文档及 `docs/agent-interface/` 的全部 Markdown，共 20 个文件、41 个本地链接目标均存在；旧命令、错误发行拼写与未实现命令示例检查通过。`git diff --check` 通过。本次没有运行后端全量测试、构建/安装单包、实测 Host 或部署生产；不修改此前全量测试结果，最终记录由主代理统一核验更新。
 
 ## 7. 备份与隔离恢复（人工操作方案）
 

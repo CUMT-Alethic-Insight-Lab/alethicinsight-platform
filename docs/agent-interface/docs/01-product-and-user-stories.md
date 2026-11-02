@@ -43,7 +43,7 @@
 
 ### D：退化模式
 
-当个人 Agent/DeepSeek 不可用，成员仍然通过 `alethic` CLI 或网页提交申请；当 GitHub 暂时故障，组织事务系统可以显示最后同步时间并允许与 GitHub 无关的申请流转。
+当个人 Agent/DeepSeek 不可用，成员仍可通过 `alethicinsight-cli` 查询和准备草稿，再到可信网页最终提交；当 GitHub 暂时故障，组织事务系统可以显示最后同步时间并允许与 GitHub 无关的申请流转。
 
 ## MVP 暂不支持
 

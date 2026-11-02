@@ -22,8 +22,7 @@ This repository is public so that candidates can **audit the session-cleaning co
 | --- | --- | --- |
 | `server/` | Platform backend and admin console (FastAPI + SQLite + vanilla HTML/JS) | 平台后端与管理端（报名 / 账号 / 问卷 / 面试评审 / 题库抽题 / 交卷暂存转发） |
 | `exam_kit/` | Candidate exam kit, pure Python standard library, plus the installer | 考生机试套件（纯 Python 标准库）与安装器 |
-| `cli/` | Member CLI with short-lived grants | 成员 CLI（独立短时授权、JSON 输出、网页确认） |
-| `mcp_adapter/` | Local stdio MCP adapter using the CLI | 本地 stdio MCP 适配器（只读与草稿，无正式提交/审批工具） |
+| `infra/interface/alethicinsight-cli/` | One public interface distribution: CLI and local stdio MCP | 同一 `alethicinsight-cli` 发行包/版本，提供 `alethicinsight-cli` 与 `alethicinsight-mcp` 两个入口；只读与草稿，最终提交在可信网页完成 |
 | `docs/` | Design and flow documents | 方案文档（`platform_flow.md` 平台流程；`agent-interface/` 成员事务与 Agent 接口设计草案） |
 
 ## Session Cleaning · 会话清洗
@@ -90,8 +89,26 @@ certutil -hashfile AlethicInsight-ExamKit-2026-setup.exe SHA256
 | Repository | 内容 |
 | --- | --- |
 | `question-bank` | 真实机试题库与解析校验（本仓 `server/tests/fixtures/` 仅有合成夹具） |
-| `infra-handoff` | 真实主机地址、账号、密钥路径与运维排障记录 |
+| `infra-handoff` | 仅私有运维资料：真实主机地址、账号、密钥路径与运维排障记录；不承载公共 CLI/MCP 源码 |
 | `exam-archive` | 考生活档（清洗件 md / 仓库链接 / 附件） |
+
+## Public Interface · 公共接口
+
+CLI 与 MCP 同属 infra，单仓单发行包单版本；在本地 Python 3.10+ venv 从仓库根安装：
+
+```sh
+python -m pip install ./infra/interface/alethicinsight-cli
+alethicinsight-cli --help
+alethicinsight-mcp --help
+```
+
+新客户端配置使用 `ALETHICINSIGHT_API_BASE_URL`（服务根，不含 `/api/v1`）与 `ALETHICINSIGHT_CONFIG_DIR`；旧 `ALETHIC_API_BASE_URL`、`ALETHIC_BASE_URL`、`ALETHIC_CONFIG_DIR` 仅为兼容别名。授权 API `/auth/cli/*` 不随发行名改动。最终提交只能由用户在可信网页确认，MCP 不提供审批或正式提交工具。
+
+- [本地 MVP 手册](docs/AGENT_INTERFACE_MVP.md)
+- [仓库职责与公开边界](docs/REPOSITORY_BOUNDARIES.md)
+- [工作区保全与迁移清单](docs/WORKSPACE_MIGRATION.md)
+
+`Alethic-Insight-Frontend-Templates` 不在此次整理范围；`E:/projects/Aletheion` 仅作历史来源，不作 monorepo。当前不拆 exam-kit、不新建 MCP 仓、不部署生产；迁移先保全 P/E 两处未提交内容，再复制验证，最后人工切换。
 
 ## License · 许可与归属
 

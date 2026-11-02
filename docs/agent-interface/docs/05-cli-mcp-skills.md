@@ -1,90 +1,75 @@
 # 05 · CLI / MCP / Skill：Agent 友好的适配层
 
-## 总目标
+## 产品与代码边界
 
-让成员熟悉的终端、Coding Agent 或通用 Agent 使用组织既有 API，而不必强制使用官网模型。**CLI 是第一优先级**：对人可读、对机器 JSON 稳定、退出码明确、环境无强耦合；MCP 是协议适配，不承担业务逻辑。
+CLI 与 MCP 同属 infra 的公共接口，位于 `infra/interface/alethicinsight-cli/`，单仓、单发行包、单版本。发行名为 `alethicinsight-cli`，提供 `alethicinsight-cli` 与 `alethicinsight-mcp` 两个入口；不另设 MCP 仓，不保留两个顶层产品目录。MCP 是调用 CLI 的本地协议适配器，不承担业务授权或直接访问数据库。
 
-## 命令草案
+从仓库根安装一次即可获得两个入口（Python 3.10+）：
 
-```bash
-# 身份
-alethic auth login
-alethic auth status --json
-alethic auth logout
-
-# 能力/知识
-alethic capabilities --json
-alethic skills list --json
-alethic knowledge search '项目申请' --json
-alethic knowledge get <document-id> --json
-
-# 项目与申请
-alethic projects list --recruiting --json
-alethic projects get <id> --json
-alethic forms schema project-join --json
-alethic applications list --mine --json
-alethic applications get <id> --json
-alethic applications submit --file ./application.json --dry-run
-alethic applications submit --file ./application.json --confirm
-
-# Agent 使用
-alethic mcp serve
+```sh
+python -m pip install ./infra/interface/alethicinsight-cli
+alethicinsight-cli --help
+alethicinsight-mcp --help
 ```
 
-所有示例命令均为**拟议命令**，需要后续编写 CLI。
+## 已实现命令与确认边界
+
+```sh
+alethicinsight-cli auth login
+alethicinsight-cli auth status --json
+alethicinsight-cli auth scopes --json
+alethicinsight-cli auth logout
+alethicinsight-cli capabilities --json
+alethicinsight-cli knowledge search '项目申请' --json
+alethicinsight-cli knowledge get DOCUMENT_ID --json
+alethicinsight-cli projects list --recruiting --json
+alethicinsight-cli projects get PROJECT_ID --json
+alethicinsight-cli forms schema project-join --json
+alethicinsight-cli applications list --mine --json
+alethicinsight-cli applications get APPLICATION_ID --json
+alethicinsight-cli applications submit --file ./application.json --dry-run --json
+alethicinsight-cli applications draft --file ./application.json --json
+```
+
+`submit --dry-run` 只进行服务端校验；`draft` 保存待确认草稿。无 dry-run 的 `applications submit` 也只创建草稿并以退出码 7 返回可信网页确认入口，不能完成正式提交。用户必须在可信网页重新核对内容并确认；CLI/MCP 不签发确认、不提交、不审批。不提供技能列表子命令，Skill 是随文档分发的说明。
 
 ## CLI 输出契约
 
-- `stdout`：`--json` 时严格输出一个可解析 JSON 对象/数组，不混入提示语；`--jsonl` 可选。
-- `stderr`：日志、警告、登录指引；不输出密钥。
-- 推荐退出码：0 成功；2 参数错误；3 未认证；4 无权限；5 API 不可用；6 输入校验失败；7 冲突或要求确认；其他内部错误。
-- 非交互模式（`--non-interactive`）严禁自动打开浏览器或提示 Enter；一律以可识别错误结束。
-- 分页与过滤：`--limit`、`--cursor`、`--project`，不可一次提取所有成员数据。
-- `--dry-run` 由服务端提供字段校验，不能仅由客户端猜测有效性。
-- `--confirm` 只在受信任的人类发起的 CLI 操作中直接表示确认；在 Agent 工具调用下必须有独立的交互确认凭据或先经网页最终确认。
+- `--json` 时 stdout 为一个 JSON 值（帮助输出除外）；日志与登录指引写 stderr，不输出密钥。
+- 退出码：0 成功；2 参数错误；3 未认证；4 无权限；5 API/网络不可用；6 校验失败；7 冲突或要求网页确认。
+- `--non-interactive` 或非 TTY 登录不打开浏览器、不等待输入；其他命令不自动登录。
+- 分页使用 `--limit 1..50`、`--cursor`，申请列表可用 `--project`；每次只读取一页。
+- 服务根通过 `ALETHICINSIGHT_API_BASE_URL` 设置，不含 `/api/v1`；专用凭据目录通过 `ALETHICINSIGHT_CONFIG_DIR` 设置。旧 `ALETHIC_API_BASE_URL`、`ALETHIC_BASE_URL`、`ALETHIC_CONFIG_DIR` 仅为兼容别名，新配置不要使用。
+- 不通过环境变量传 token；不把本地凭据文件、一次性 code 或网页 token 交给 Agent。
 
-## MCP
+## 本地 stdio MCP
 
-优先做本地 **stdio MCP 适配器**：成员安装 CLI、完成登录，然后 MCP 子进程复用同一 CLI/SDK 的授权能力。它只负责工具协议和调用路由，API 权限始终由服务端校验。
+成员在 MCP 会话外完成 CLI 登录后，由 Host 启动同一发行包的入口：
 
-工具首批建议：
+```json
+{"command":"alethicinsight-mcp","args":["--cli","alethicinsight-cli","--timeout","15"],"env":{"ALETHICINSIGHT_API_BASE_URL":"http://127.0.0.1:8901"}}
+```
 
-| MCP Tool（建议名） | 后端映射 | 风险 |
+生产配置应指定可信本地可执行文件的绝对路径，Windows 使用 venv 的 `Scripts/alethicinsight-mcp.exe` 和 `Scripts/alethicinsight-cli.exe`。`--cli` 不是 shell 字符串；工具参数不能覆盖它或服务地址。
+
+| MCP Tool | 后端映射 | 风险 |
 |---|---|---|
 | `org_capabilities` | GET `/capabilities` | 低 |
-| `org_search_knowledge` | GET `/knowledge/search` | 低（内容本身受 ACL） |
+| `org_search_knowledge` | GET `/knowledge/search` | 低，内容仍受 ACL |
 | `org_list_projects` | GET `/projects` | 低 |
 | `org_get_project` | GET `/projects/{id}` | 低 |
 | `org_get_form_schema` | GET `/forms/{kind}/schema` | 低 |
-| `org_list_my_applications` | GET `/applications?mine=true` | 中（个人信息） |
-| `org_prepare_application` | 本地草稿/服务端校验 | 中 |
-| `org_submit_application` | POST `/applications` | 高：必须确认 |
+| `org_list_my_applications` | GET `/applications?mine=true` | 中，个人信息 |
+| `org_prepare_application` | POST `/applications/drafts` | 中，仅草稿 |
 
-不提供通用 `execute_sql`、`run_shell_on_server`、`fetch_any_url`、`list_all_members` 等高危万能工具。
+API 表中路径相对 `/api/v1`；`/auth/cli/*` 授权路由不因发行名变化而改名。不提供最终提交、确认签发、review、SQL、shell、任意 URL 抓取或全员列表工具。stdout 仅承载逐行 JSON-RPC，日志不混入协议。
 
-### 协议版本兼容策略
-
-截至编制日期，MCP 官方规范主页指向 `2026-07-28` 版本，协议与 Client/SDK 支持程度可能不一致。**不要将某个版本硬编码为所有客户端必须支持。** 先用成熟 SDK 实现本地 stdio，明确做目标客户端的实机兼容测试；如计划远程 Streamable HTTP，单独实施并验证 OAuth 发现、资源受众、Origin 检查等安全要求。远程 MCP 并不是第一版的前置条件。
-
-参见：https://modelcontextprotocol.io/specification
+实现协商范围为 `2024-11-05`、`2025-03-26`、`2025-06-18`，不代表所有客户端完整规范兼容。只提供本地 stdio，不提供远程 MCP、资源、prompts 或订阅。真实 Host 名称、版本、握手与工具调用结果需要另行实测，不以协议自动测试代替。
 
 ## Skill 三层发现
 
-**L1（最薄）**：CLI/Agent 初始说明：你可以通过 `alethic capabilities --json` 发现能力，通过 `alethic skills list` 寻找具体工作流。
+- **L1**：薄入口说明，通过 `alethicinsight-cli capabilities --json` 发现实时能力。
+- **L2**：按需读取 [组织访问 Skill](../skills/org-access/SKILL.md)，说明工作流、权限与输入输出。
+- **L3**：按用户权限检索项目、表单与带来源/版本的文档；不把实时数据写死在 Skill。
 
-**L2（单个 Skill）**：一份 `SKILL.md` 声明何时使用、工具清单、可执行示例、权限、资料地址、对用户应询问什么。
-
-**L3（实时数据）**：Skill 使用 API 检索真实项目、表单和文档；文档来自正式仓库并带版本与访问范围，不能把实时库存写死在 Skill。
-
-`skills/org-access/SKILL.md` 给出具体示范。Skill 不是后端授权规则，也不是模型系统提示词的替代品。
-
-## 支持模式
-
-- 成员选择**自己**的模型/CLI/MCP 客户端，由个人承担使用模型的费用。
-- 不同模型有不同工具/安全能力；不保证每种 Agent 原生支持 MCP，CLI 是基本兼容路径。
-- 官网页面里的 DeepSeek Agent（若上线）只是相同 API 的可选封装，使用组织内部成员的独立限额和服务端密钥。
-- CLI 必须允许没有 Agent 的普通终端用户完成同样事务。
-
-## 技术选型倾向
-
-为避免低配小主机重复维护前端与 API 代码，推荐从已存在的官网语言生态选择后端/CLI 可共享的契约模型；实现语言与框架需在查看网站仓库后决定，而不是预先拍板。Go CLI 单二进制、Python CLI 和 Node CLI 都有可行性，权衡点是现有成员维护能力、认证库、二进制发布流程。
+Skill 不是授权规则。成员自行选择模型并承担个人模型费用；没有 Agent 也可通过 CLI 查询和准备草稿，再由网页最终提交。可选官网模型并非本次交付。详见[仓库边界](../../REPOSITORY_BOUNDARIES.md)。

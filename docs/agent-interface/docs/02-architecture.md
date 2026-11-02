@@ -5,13 +5,14 @@
 ```mermaid
 flowchart TB
   U[认证成员] --> W[网页内部平台]
-  U --> C[本地 alethic CLI]
+  U --> C[本地 alethicinsight-cli]
   U --> A[个人 Coding / 通用 Agent]
   U --> O[可选官网 DeepSeek Agent]
   A --> C
-  C --> M[本地 stdio MCP 适配 / CLI]
+  A --> M[本地 stdio alethicinsight-mcp]
+  M --> C
   W --> API[统一 REST API / BFF]
-  M --> API
+  C --> API
   O --> API
   API --> Auth[认证与授权中间件]
   Auth --> App[模块化单体: 项目 / 申请 / 资源 / 文档]
@@ -63,7 +64,9 @@ flowchart TB
 
 - `api`/`services`/`repositories`/`adapters` 在代码内解耦。
 - `contracts/openapi-skeleton.yaml` 是初版协议起点；正式契约由服务端生成或经契约测试比对。
-- 将 HTTP 客户端、CLI、MCP 均指向同一个 SDK/REST 接口；禁止客户端绕过 API 去读本地数据库。
+- CLI 与 MCP 公共接口同属 infra，代码统一在 `infra/interface/alethicinsight-cli/`；单仓、单发行包 `alethicinsight-cli`、单版本，安装提供 `alethicinsight-cli` 与 `alethicinsight-mcp` 两个入口，不单独建 MCP 仓。
+- MCP 调用同包 CLI，HTTP 客户端与 CLI 使用统一 REST 接口；禁止客户端绕过 API 去读本地数据库。`infra-handoff` 只维护私有运维资料，不承载公共接口代码。
+- `Alethic-Insight-Frontend-Templates` 不在此次整理范围内；`E:/projects/Aletheion` 仅为历史来源，不作为 monorepo。详见[仓库边界](../../REPOSITORY_BOUNDARIES.md)与[工作区迁移清单](../../WORKSPACE_MIGRATION.md)。
 - API 版本 `/api/v1`；破坏兼容时升级主版本或引入兼容迁移。
 
 ## 对外开放的含义

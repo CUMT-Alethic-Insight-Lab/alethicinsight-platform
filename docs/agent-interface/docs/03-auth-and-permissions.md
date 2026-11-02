@@ -56,10 +56,10 @@
 ## CLI 要求
 
 ```bash
-alethic auth login
-alethic auth status --json
-alethic auth scopes --json
-alethic auth logout
+alethicinsight-cli auth login
+alethicinsight-cli auth status --json
+alethicinsight-cli auth scopes --json
+alethicinsight-cli auth logout
 ```
 
 - 不打印 bearer token；CLI 日志默认脱敏。
