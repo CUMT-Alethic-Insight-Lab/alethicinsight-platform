@@ -1,3 +1,4 @@
+import json
 import sqlite3
 
 from fastapi import APIRouter, Depends, HTTPException, Request
@@ -6,6 +7,7 @@ from pydantic import BaseModel
 from .. import auth, db
 from ..auth import require_admin
 from ..org_auth import revoke_cli
+from ..constants import ACCOUNT_ROLES
 from ..studentid import parse_student_id
 
 router = APIRouter(prefix="/api/admin/accounts", tags=["accounts"])
@@ -27,6 +29,9 @@ class RoleBody(BaseModel):
     role: str
 
 
+from ..member_profile import completion_status, trusted_identity
+
+
 def _current_admin(request: Request) -> sqlite3.Row:
     return auth.require_admin_session(request)
 
@@ -45,6 +50,8 @@ def list_accounts(
             "SELECT student_id, name, registration_complete FROM application"
             " ORDER BY created_at DESC"
         ).fetchall()
+        statuses = {a["student_id"]: completion_status(conn, a) for a in accounts}
+        identities = {a["student_id"]: trusted_identity(conn, a["student_id"]) for a in accounts}
     latest_app = {}
     for row in apps:
         latest_app.setdefault(row["student_id"], row)
@@ -56,20 +63,22 @@ def list_accounts(
         parsed = parse_student_id(acct["student_id"])
         item = {
             "student_id": acct["student_id"],
-            "name": app_row["name"] if app_row is not None else "",
+            "name": identities[acct["student_id"]]["name"],
             "nickname": acct["nickname"],
             "role": acct["role"],
             "dept": parsed["dept"],
             "enroll_year": parsed["enroll_year"],
             "pw_changed": bool(acct["pw_changed"]),
             "registration_complete": bool(app_row["registration_complete"]) if app_row is not None else False,
+            "profile_filled": statuses[acct["student_id"]]["profile_completed"],
+            **statuses[acct["student_id"]],
+            "member_identity": identities[acct["student_id"]],
             "created_at": acct["created_at"],
         }
         if q:
             needle = q.lower()
             if not (needle in acct["student_id"].lower()
-                    or needle in item["name"].lower()
-                    or needle in item["nickname"].lower()):
+                    or needle in item["name"].lower()):
                 continue
         items.append(item)
     return {"items": items}
@@ -78,8 +87,9 @@ def list_accounts(
 @router.post("/{student_id}/role")
 def set_role(student_id: str, body: RoleBody, request: Request):
     sess = _current_admin(request)
-    if body.role not in ("admin", "member", "applicant"):
-        raise HTTPException(status_code=400, detail="无效角色，须为 admin/member/applicant")
+    if body.role not in ACCOUNT_ROLES:
+        raise HTTPException(status_code=400,
+                            detail="无效角色，须为 admin/member/applicant")
     with db.connection() as conn:
         conn.execute("BEGIN IMMEDIATE")
         actor = conn.execute(
@@ -104,7 +114,7 @@ def set_role(student_id: str, body: RoleBody, request: Request):
             "UPDATE account SET role = ?, updated_at = ? WHERE student_id = ?",
             (body.role, auth._utcnow().isoformat(), student_id),
         )
-        if acct["role"] != body.role:
+        if body.role != acct["role"]:
             conn.execute("DELETE FROM login_session WHERE student_id = ?", (student_id,))
             revoke_cli(conn, student_id)
         auth.write_audit(conn, sess["student_id"], "set_role", student_id,
