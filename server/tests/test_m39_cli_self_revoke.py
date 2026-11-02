@@ -66,6 +66,19 @@ def revoked_at(grant_id):
 
 def test_self_revoke_invalidates_old_token_and_retry_is_unauthorized(self_revoke_client):
     client = self_revoke_client
+    response = client.get("/openapi.json")
+    assert response.status_code == 200, response.text
+    document = response.json()
+    operation = document["paths"][SELF_REVOKE]["delete"]
+    assert operation["security"] == [{"HTTPBearer": []}]
+    assert document["components"]["securitySchemes"]["HTTPBearer"] == {
+        "type": "http", "scheme": "bearer",
+    }
+    schema = operation["responses"]["200"]["content"]["application/json"]["schema"]
+    model = document["components"]["schemas"][schema["$ref"].rsplit("/", 1)[1]]
+    assert model["type"] == "object"
+    assert model["required"] == ["revoked"]
+    assert model["properties"]["revoked"]["type"] == "boolean"
     web = web_session("self-owner")
     cli, grant_id = cli_grant(client, web)
     assert client.get("/api/v1/me", headers=cli).status_code == 200

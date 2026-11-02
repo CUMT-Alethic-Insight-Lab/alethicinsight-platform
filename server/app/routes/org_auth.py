@@ -5,6 +5,7 @@ import sqlite3
 from datetime import timedelta
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
+from fastapi.security import HTTPBearer
 from pydantic import BaseModel, Field
 
 from .. import auth, config, db
@@ -124,7 +125,12 @@ def grants(request: Request, response: Response,
             "next_cursor": rows[limit - 1]["id"] if len(rows) > limit else None}
 
 
-@router.delete("/grants/self")
+class RevokeSelfResponse(BaseModel):
+    revoked: bool
+
+
+@router.delete("/grants/self", response_model=RevokeSelfResponse,
+               dependencies=[Depends(HTTPBearer(auto_error=False))])
 def revoke_self(request: Request, response: Response):
     identity = require_org_identity(request)
     if identity.auth_type != "cli":
