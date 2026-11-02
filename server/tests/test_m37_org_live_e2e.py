@@ -142,6 +142,10 @@ def test_live_http_cli_mcp_application_flow(live_org, tmp_path):
         "base_url": base, "token": exchanged["token"],
         "expires_at": exchanged["expires_at"], "scopes": scopes,
     }), encoding="utf-8")
+    sys.path.insert(0, str(ROOT / "infra" / "interface" / "alethicinsight-cli"))
+    from alethicinsight_cli.credentials import private_path
+    private_path(config_dir, directory=True)
+    private_path(config_dir / "credentials.json")
     cli_env = dict(os.environ)
     cli_env.update({
         "PYTHONPATH": str(ROOT / "infra" / "interface" / "alethicinsight-cli"),
