@@ -127,9 +127,9 @@ def test_unhandled_org_error_has_envelope_and_matching_request_id(security_clien
 
 
 def test_mcp_query_limit_matches_api():
-    adapter = Path(__file__).resolve().parents[2] / "mcp_adapter"
+    adapter = Path(__file__).resolve().parents[2] / "infra" / "interface" / "alethicinsight-cli"
     sys.path.insert(0, str(adapter))
-    from alethic_mcp.server import TOOL_MAP, InvalidParams, validate
+    from alethicinsight_mcp.server import TOOL_MAP, InvalidParams, validate
 
     schema = TOOL_MAP["org_search_knowledge"]["inputSchema"]
     validate({"query": "x" * 200}, schema)

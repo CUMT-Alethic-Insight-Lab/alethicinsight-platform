@@ -17,8 +17,21 @@ class NoRedirect(urllib.request.HTTPRedirectHandler):
 
 
 def normalize_base(value):
-    parts = urllib.parse.urlsplit(value)
+    try:
+        if not isinstance(value, str) or any(c.isspace() or ord(c) < 32 for c in value):
+            raise ValueError()
+        parts = urllib.parse.urlsplit(value)
+        port = parts.port
+        if port is not None and not 1 <= port <= 65535:
+            raise ValueError()
+    except ValueError:
+        raise CliError("INVALID_ARGUMENT", "Invalid API base URL or port.", 2) from None
     if (
+        "/api/v1" in urllib.parse.unquote(parts.path).lower()
+        or "%" in parts.netloc
+        or "\\" in value
+        or parts.netloc.endswith(":")
+        or
         parts.scheme not in {"https", "http"}
         or not parts.hostname
         or parts.username is not None
@@ -63,7 +76,7 @@ class Client:
         headers = {"Accept": "application/json"}
         if authenticated:
             if not self.token:
-                raise CliError("AUTH_REQUIRED", "Run alethic auth login.", 3)
+                raise CliError("AUTH_REQUIRED", "Run alethicinsight-cli auth login.", 3)
             headers["Authorization"] = "Bearer " + self.token
         data = None
         if body is not None:

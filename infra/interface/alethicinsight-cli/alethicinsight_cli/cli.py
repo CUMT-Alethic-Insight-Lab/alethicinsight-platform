@@ -18,14 +18,14 @@ DEFAULT_SCOPES = ["profile:read:self", "projects:read", "knowledge:read", "appli
 
 class Parser(argparse.ArgumentParser):
     def error(self, message):
-        raise CliError("INVALID_ARGUMENT", "Invalid arguments; use alethic --help for supported commands.", 2)
+        raise CliError("INVALID_ARGUMENT", "Invalid arguments; use alethicinsight-cli --help for supported commands.", 2)
 
 
 def parser():
     common = argparse.ArgumentParser(add_help=False)
     common.add_argument("--json", action="store_true", default=argparse.SUPPRESS)
     common.add_argument("--non-interactive", action="store_true", default=argparse.SUPPRESS)
-    root = Parser(prog="alethic", parents=[common])
+    root = Parser(prog="alethicinsight-cli", parents=[common])
     groups = root.add_subparsers(dest="group", required=True)
 
     def add(parent, name):
@@ -94,9 +94,18 @@ def page_query(args):
 
 def execute(args, client, store):
     if args.group == "auth" and args.action == "logout":
-        store.delete()
-        print("Local credentials deleted. The server grant was NOT revoked; revoke it on the trusted /org webpage (or wait for expiry).", file=sys.stderr)
-        return {"logged_out": True, "server_revoked": False}
+        revoked = False
+        try:
+            client.token = store.load(client.base)["token"]
+            result = client.request("DELETE", "/auth/cli/grants/self")
+            revoked = isinstance(result, dict) and result.get("revoked") is True
+        except CliError:
+            pass
+        finally:
+            store.delete()
+        if not revoked:
+            print("Local credentials deleted. Server revocation was not confirmed; revoke on the trusted /org webpage if needed.", file=sys.stderr)
+        return {"logged_out": True, "server_revoked": revoked}
     if args.group == "auth" and args.action == "login":
         request_id = uuid.uuid4().hex
         scopes = args.scopes or DEFAULT_SCOPES
@@ -105,7 +114,8 @@ def execute(args, client, store):
             raise CliError("AUTH_REQUIRED", "Login requires an interactive terminal and trusted webpage authorization.", 3, authorization_url=browser_url)
         print("Authorize this CLI on the trusted website:\n" + browser_url, file=sys.stderr)
         try:
-            webbrowser.open(browser_url)
+            if not webbrowser.open(browser_url):
+                print("Could not open a browser; open the URL above manually.", file=sys.stderr)
         except (OSError, webbrowser.Error):
             print("Could not open a browser; open the URL above manually.", file=sys.stderr)
         code = getpass.getpass("One-time authorization code (hidden): ", stream=sys.stderr).strip()
@@ -167,7 +177,7 @@ def main(argv=None):
     exit_code = 0
     try:
         args = parser().parse_args(argv)
-        base = normalize_base(os.environ.get("ALETHIC_API_BASE_URL", os.environ.get("ALETHIC_BASE_URL", DEFAULT_BASE)))
+        base = normalize_base(os.environ.get("ALETHICINSIGHT_API_BASE_URL", os.environ.get("ALETHIC_API_BASE_URL", os.environ.get("ALETHIC_BASE_URL", DEFAULT_BASE))))
         client = Client(base)
         payload = execute(args, client, CredentialStore())
     except CliError as exc:

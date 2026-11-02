@@ -7,7 +7,7 @@ import sys
 import pytest
 
 
-ADAPTER = Path(__file__).resolve().parents[2] / "mcp_adapter"
+ADAPTER = Path(__file__).resolve().parents[2] / "infra" / "interface" / "alethicinsight-cli"
 INITIALIZE = {"jsonrpc": "2.0", "id": 1, "method": "initialize", "params": {
     "protocolVersion": "2025-06-18", "capabilities": {},
     "clientInfo": {"name": "m36-test", "version": "1"}}}
@@ -69,7 +69,7 @@ def exchange(mock_cli, messages, timeout=2.0, raw=False):
     launcher = (
         "import sys; "
         f"sys.path.insert(0, {str(ADAPTER)!r}); "
-        "from alethic_mcp.server import CliRunner, serve; "
+        "from alethicinsight_mcp.server import CliRunner, serve; "
         f"serve(CliRunner((sys.executable, {str(script)!r}), {timeout!r}))"
     )
     environment = dict(os.environ)
@@ -245,11 +245,11 @@ def test_real_cli_against_loopback_http_uses_no_credentials_in_mcp(tmp_path, mon
     import threading
     from urllib.parse import parse_qs, urlsplit
 
-    cli_directory = ADAPTER.parent / "cli"
+    cli_directory = ADAPTER
     wrapper = tmp_path / "real_cli.py"
     wrapper.write_text(
         f"import sys; sys.path.insert(0, {str(cli_directory)!r})\n"
-        "from alethic_cli.cli import main\nraise SystemExit(main())\n", encoding="utf-8")
+        "from alethicinsight_cli.cli import main\nraise SystemExit(main())\n", encoding="utf-8")
     calls = []
     synthetic_token = "m36-local-only-synthetic-grant"
 
@@ -305,3 +305,15 @@ def test_real_cli_against_loopback_http_uses_no_credentials_in_mcp(tmp_path, mon
     assert calls[1][0:2] == ("POST", "/recruitment/api/v1/applications/drafts")
     assert all(item[2] == "Bearer " + synthetic_token for item in calls)
     assert synthetic_token.encode() not in raw
+
+
+def test_default_runner_uses_current_interpreter_and_new_environment_allowlist():
+    sys.path.insert(0, str(ADAPTER))
+    from alethicinsight_mcp.server import CliRunner, SAFE_ENV
+    from alethicinsight_cli import __version__
+    from alethicinsight_mcp import __version__ as mcp_version
+
+    assert CliRunner().command == (sys.executable, "-m", "alethicinsight_cli")
+    assert {"ALETHICINSIGHT_API_BASE_URL", "ALETHICINSIGHT_CONFIG_DIR", "ALETHIC_CONFIG_DIR"} <= SAFE_ENV
+    assert "PYTHONPATH" not in SAFE_ENV
+    assert __version__ == mcp_version

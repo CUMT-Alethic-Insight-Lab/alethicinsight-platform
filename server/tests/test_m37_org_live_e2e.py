@@ -144,14 +144,14 @@ def test_live_http_cli_mcp_application_flow(live_org, tmp_path):
     }), encoding="utf-8")
     cli_env = dict(os.environ)
     cli_env.update({
-        "PYTHONPATH": str(ROOT / "cli"),
+        "PYTHONPATH": str(ROOT / "infra" / "interface" / "alethicinsight-cli"),
         "ALETHIC_API_BASE_URL": base,
         "ALETHIC_CONFIG_DIR": str(config_dir),
     })
 
     def cli(*arguments):
         result = subprocess.run(
-            [sys.executable, "-m", "alethic_cli", *arguments, "--json", "--non-interactive"],
+            [sys.executable, "-m", "alethicinsight_cli", *arguments, "--json", "--non-interactive"],
             cwd=ROOT, env=cli_env, capture_output=True, text=True, timeout=20,
         )
         assert exchanged["token"] not in result.stdout + result.stderr
@@ -199,13 +199,13 @@ def test_live_http_cli_mcp_application_flow(live_org, tmp_path):
     wrapper = work / "cli_wrapper.py"
     wrapper.write_text(
         "import runpy,sys\n"
-        f"sys.path.insert(0,{str(ROOT / 'cli')!r})\n"
-        "sys.argv[0]='alethic'\n"
-        "runpy.run_module('alethic_cli',run_name='__main__')\n",
+        f"sys.path.insert(0,{str(ROOT / 'infra' / 'interface' / 'alethicinsight-cli')!r})\n"
+        "sys.argv[0]='alethicinsight-cli'\n"
+        "runpy.run_module('alethicinsight_cli',run_name='__main__')\n",
         encoding="utf-8",
     )
     launcher = (
-        "import sys; from alethic_mcp.server import CliRunner,serve; "
+        "import sys; from alethicinsight_mcp.server import CliRunner,serve; "
         f"serve(CliRunner((sys.executable,{str(wrapper)!r}),10))"
     )
     messages = [
@@ -218,7 +218,7 @@ def test_live_http_cli_mcp_application_flow(live_org, tmp_path):
             "name": "org_search_knowledge", "arguments": {"query": "成员"}}},
     ]
     mcp_env = dict(cli_env)
-    mcp_env["PYTHONPATH"] = str(ROOT / "mcp_adapter")
+    mcp_env["PYTHONPATH"] = str(ROOT / "infra" / "interface" / "alethicinsight-cli")
     result = subprocess.run(
         [sys.executable, "-c", launcher], cwd=ROOT, env=mcp_env,
         input="".join(json.dumps(message) + "\n" for message in messages),

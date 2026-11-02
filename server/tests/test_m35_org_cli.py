@@ -15,11 +15,11 @@ from urllib.parse import parse_qs, urlsplit
 import pytest
 
 
-CLI_ROOT = Path(__file__).resolve().parents[2] / "cli"
+CLI_ROOT = Path(__file__).resolve().parents[2] / "infra" / "interface" / "alethicinsight-cli"
 sys.path.insert(0, str(CLI_ROOT))
-from alethic_cli import cli
-from alethic_cli.client import CliError, normalize_base
-from alethic_cli.credentials import CredentialStore
+from alethicinsight_cli import cli
+from alethicinsight_cli.client import CliError, normalize_base
+from alethicinsight_cli.credentials import CredentialStore
 
 
 TOKEN = "private-cli-bearer-never-print"
@@ -39,6 +39,9 @@ def api(monkeypatch, tmp_path):
             self.handle_request()
 
         def do_POST(self):
+            self.handle_request()
+
+        def do_DELETE(self):
             self.handle_request()
 
         def handle_request(self):
@@ -186,7 +189,7 @@ def test_scopes_local_and_logout_truthfully_reports_no_server_revoke(api):
     assert api["requests"] == []
     code, value, stderr = invoke("auth", "logout")
     assert code == 0 and value == {"logged_out": True, "server_revoked": False}
-    assert "NOT revoked" in stderr
+    assert "revocation was not confirmed" in stderr
     assert not api["store"].path.exists()
     assert invoke("capabilities")[0] == 3
     assert invoke("auth", "logout")[0] == 0
@@ -258,7 +261,7 @@ def test_output_redacts_nested_credentials_and_bearer_echo(api):
 
 
 def test_executable_module_json_contract(api):
-    result = subprocess.run([sys.executable, "-m", "alethic_cli", "--json", "capabilities"], cwd=CLI_ROOT, capture_output=True, text=True, timeout=15)
+    result = subprocess.run([sys.executable, "-m", "alethicinsight_cli", "--json", "capabilities"], cwd=CLI_ROOT, capture_output=True, text=True, timeout=15)
     assert result.returncode == 0
     assert json.loads(result.stdout) == {"items": [], "next_cursor": None}
     assert TOKEN not in result.stdout + result.stderr
@@ -283,7 +286,7 @@ def test_validation_false_is_exit_six(api):
 
 
 def test_credential_acl_failure_never_persists_new_token(api, monkeypatch):
-    import alethic_cli.credentials as credentials
+    import alethicinsight_cli.credentials as credentials
 
     api["store"].delete()
     monkeypatch.setattr(credentials, "private_path", lambda *args, **kwargs: (_ for _ in ()).throw(OSError("failure")))
@@ -295,7 +298,7 @@ def test_credential_acl_failure_never_persists_new_token(api, monkeypatch):
 
 def test_windows_private_acl_uses_current_user_without_logging_token(monkeypatch, tmp_path):
     import types
-    import alethic_cli.credentials as credentials
+    import alethicinsight_cli.credentials as credentials
 
     commands = []
 
@@ -307,12 +310,17 @@ def test_windows_private_acl_uses_current_user_without_logging_token(monkeypatch
     monkeypatch.setattr(credentials, "os", types.SimpleNamespace(name="nt"))
     monkeypatch.setattr(credentials.subprocess, "run", run)
     credentials.private_path(tmp_path / "credentials.json")
-    assert commands == [["whoami"], ["icacls", str(tmp_path / "credentials.json"), "/inheritance:r", "/grant:r", "DOMAIN\\member:F"]]
+    assert len(commands) == 1
+    assert commands[0][:4] == ["powershell.exe", "-NoProfile", "-NonInteractive", "-Command"]
+    script = commands[0][4]
+    assert "SetAccessRuleProtection($true,$false)" in script
+    assert "GetAccessRules" in script and "$rules.Count -ne 1" in script
+    assert "GetOwner" in script and "RemoveAccessRuleSpecific" in script
 
 
 def test_posix_permissions_are_private(monkeypatch):
     import types
-    import alethic_cli.credentials as credentials
+    import alethicinsight_cli.credentials as credentials
 
     modes = []
     path = types.SimpleNamespace(chmod=modes.append)
@@ -335,3 +343,127 @@ def test_nonfinite_api_json_is_stable_error(api, body):
     api["routes"][("GET", "/recruitment/api/v1/capabilities")] = (200, body)
     code, value, _ = invoke("capabilities")
     assert code == 5 and value["error"]["code"] == "API_UNAVAILABLE"
+
+
+@pytest.mark.parametrize("base", ["https://example.com:bad", "https://example.com:65536", "https://example.com:0", "https://example.com:", "https://example.com/api/v1", "https://example.com/api/v1/api/v1", "https://example.com/%61pi/v1", "https://[broken", "https://example.com/a b"])
+def test_invalid_port_and_api_prefix_are_argument_errors(base):
+    with pytest.raises(CliError) as exc:
+        normalize_base(base)
+    assert exc.value.exit_code == 2
+
+
+def test_new_environment_overrides_legacy(api, monkeypatch):
+    monkeypatch.setenv("ALETHICINSIGHT_API_BASE_URL", api["base"])
+    monkeypatch.setenv("ALETHIC_API_BASE_URL", "https://invalid.example/api/v1")
+    monkeypatch.setenv("ALETHICINSIGHT_CONFIG_DIR", str(api["store"].directory))
+    monkeypatch.setenv("ALETHIC_CONFIG_DIR", str(api["tmp"] / "unused"))
+    assert invoke("capabilities")[0] == 0
+    assert len(api["requests"]) == 1
+
+
+def test_logout_revokes_only_current_grant_over_http(api):
+    path = "/recruitment/api/v1/auth/cli/grants/self"
+    api["routes"][("DELETE", path)] = (200, {"revoked": True})
+    assert invoke("auth", "logout")[1] == {"logged_out": True, "server_revoked": True}
+    assert api["requests"] == [{"method": "DELETE", "path": path, "body": None, "auth": "Bearer " + TOKEN}]
+    assert not api["store"].path.exists()
+
+
+def test_logout_http_failure_still_deletes_credentials(api, monkeypatch):
+    from alethicinsight_cli.client import Client
+
+    def request(*args, **kwargs):
+        raise CliError("API_UNAVAILABLE", TOKEN, 5)
+
+    monkeypatch.setattr(Client, "request", request)
+    assert invoke("auth", "logout")[1] == {"logged_out": True, "server_revoked": False}
+    assert not api["store"].path.exists()
+
+
+def test_legacy_fallback_base_binding_explicit_override_and_logout_barrier(tmp_path, monkeypatch):
+    monkeypatch.delenv("ALETHICINSIGHT_CONFIG_DIR", raising=False)
+    monkeypatch.delenv("ALETHIC_CONFIG_DIR", raising=False)
+    monkeypatch.setenv("LOCALAPPDATA", str(tmp_path))
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path))
+    store = CredentialStore()
+    store.legacy_path.parent.mkdir()
+    base = "https://example.com/recruitment"
+    store.legacy_path.write_text(json.dumps({"base_url": base, "token": TOKEN, "expires_at": time.time() + 300, "scopes": []}))
+    assert store.load(base)["token"] == TOKEN
+    with pytest.raises(CliError):
+        store.load("https://other.example")
+    monkeypatch.setenv("ALETHICINSIGHT_CONFIG_DIR", str(tmp_path / "explicit"))
+    with pytest.raises(CliError):
+        CredentialStore().load(base)
+    store.delete()
+    assert store.legacy_path.exists()
+    with pytest.raises(CliError):
+        store.load(base)
+    store.save(base, {"token": TOKEN, "expires_at": time.time() + 300, "scopes": []})
+    store.path.unlink()
+    with pytest.raises(CliError):
+        store.load(base)
+
+
+def test_browser_false_warns_without_leaking_authorization_code(api, monkeypatch):
+    monkeypatch.setattr(sys.stdin, "isatty", lambda: True)
+    monkeypatch.setattr(cli.webbrowser, "open", lambda _: False)
+    monkeypatch.setattr(cli.getpass, "getpass", lambda *args, **kwargs: "")
+    code, _, stderr = invoke("auth", "login")
+    assert code == 3 and "open the URL above manually" in stderr
+    assert api["requests"] == []
+
+
+def test_hardlinked_credentials_fail_closed(api):
+    alias = api["tmp"] / "alias.json"
+    os.link(api["store"].path, alias)
+    with pytest.raises(CliError):
+        api["store"].load(api["base"])
+    with pytest.raises(CliError):
+        api["store"].save(api["base"], {"token": TOKEN, "expires_at": time.time() + 300, "scopes": []})
+    assert TOKEN in alias.read_text()
+
+
+def test_final_acl_failure_removes_written_credentials(api, monkeypatch):
+    import alethicinsight_cli.credentials as credentials
+
+    original = credentials.private_path
+
+    def private(path, directory=False):
+        if path == api["store"].path:
+            raise OSError("final ACL failed")
+        return original(path, directory)
+
+    monkeypatch.setattr(credentials, "private_path", private)
+    with pytest.raises(CliError):
+        api["store"].save(api["base"], {"token": TOKEN, "expires_at": time.time() + 300, "scopes": []})
+    assert not api["store"].path.exists()
+
+
+def test_linked_directory_fails_closed_for_load_save_and_logout(tmp_path, monkeypatch):
+    target = tmp_path / "target"
+    target.mkdir()
+    link = tmp_path / "link"
+    if os.name == "nt":
+        subprocess.run(["cmd.exe", "/c", "mklink", "/J", str(link), str(target)], check=True, capture_output=True)
+    else:
+        link.symlink_to(target, target_is_directory=True)
+    monkeypatch.setenv("ALETHICINSIGHT_CONFIG_DIR", str(link))
+    store = CredentialStore()
+    base = "https://example.com"
+    value = {"base_url": base, "token": TOKEN, "expires_at": time.time() + 300, "scopes": []}
+    (target / "credentials.json").write_text(json.dumps(value))
+    try:
+        with pytest.raises(CliError):
+            store.load(base)
+        with pytest.raises(CliError):
+            store.save(base, value)
+        with pytest.raises(CliError):
+            store.delete()
+        assert json.loads((target / "credentials.json").read_text()) == value
+        assert not (target / "legacy-disabled").exists()
+    finally:
+        if os.name == "nt":
+            link.rmdir()
+        else:
+            link.unlink()
