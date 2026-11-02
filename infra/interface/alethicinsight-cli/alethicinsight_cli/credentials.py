@@ -51,14 +51,16 @@ def safe_path(path, directory=False):
     return path
 
 
-def private_path(path, directory=False):
-    if os.name == "nt":
-        escaped = str(path).replace("'", "''")
+def windows_private_path(path, directory=False, secure=False):
+    escaped = str(path).replace("'", "''")
+    script = (
+        "$ErrorActionPreference='Stop';"
+        f"$p='{escaped}';"
+        "$sid=[System.Security.Principal.WindowsIdentity]::GetCurrent().User;"
+    )
+    if secure:
         inheritance = "ContainerInherit,ObjectInherit" if directory else "None"
-        script = (
-            "$ErrorActionPreference='Stop';"
-            f"$p='{escaped}';"
-            "$sid=[System.Security.Principal.WindowsIdentity]::GetCurrent().User;"
+        script += (
             "$acl=Get-Acl -LiteralPath $p;"
             "if($acl.GetOwner([System.Security.Principal.SecurityIdentifier]) -ne $sid){throw 'Unsafe credential owner'};"
             "$acl.SetAccessRuleProtection($true,$false);"
@@ -67,15 +69,41 @@ def private_path(path, directory=False):
             f"$rule=New-Object System.Security.AccessControl.FileSystemAccessRule($sid,'FullControl','{inheritance}','None','Allow');"
             "$acl.AddAccessRule($rule);"
             f"[System.IO.{'Directory' if directory else 'File'}]::SetAccessControl($p,$acl);"
-            "$actual=Get-Acl -LiteralPath $p;"
-            "$rules=@($actual.GetAccessRules($true,$true,[System.Security.Principal.SecurityIdentifier]));"
-            "if(!$actual.AreAccessRulesProtected -or $rules.Count -ne 1 -or "
-            "$rules[0].IdentityReference -ne $sid -or $rules[0].IsInherited -or "
-            "$rules[0].AccessControlType -ne 'Allow' -or $rules[0].FileSystemRights -ne 'FullControl')"
-            "{throw 'Unsafe final credential ACL'}"
         )
-        subprocess.run(["powershell.exe", "-NoProfile", "-NonInteractive", "-Command", script],
-                       check=True, capture_output=True, text=True)
+    script += (
+        "$actual=Get-Acl -LiteralPath $p;"
+        "$rules=@($actual.GetAccessRules($true,$true,[System.Security.Principal.SecurityIdentifier]) | "
+        "ForEach-Object { @{sid=$_.IdentityReference.Value; inherited=$_.IsInherited; "
+        "type=$_.AccessControlType.ToString(); rights=$_.FileSystemRights.ToString()} });"
+        "@{owner=$actual.GetOwner([System.Security.Principal.SecurityIdentifier]).Value; "
+        "current_user=$sid.Value; protected=$actual.AreAccessRulesProtected; rules=$rules} | ConvertTo-Json -Depth 4 -Compress"
+    )
+    result = subprocess.run(["powershell.exe", "-NoProfile", "-NonInteractive", "-Command", script],
+                            check=True, capture_output=True, text=True)
+    try:
+        actual = json.loads(result.stdout)
+        sid = actual["current_user"]
+        if not isinstance(sid, str) or not sid or actual["owner"] != sid or actual["protected"] is not True or actual["rules"] != [
+            {"sid": sid, "inherited": False, "type": "Allow", "rights": "FullControl"}
+        ]:
+            raise ValueError()
+    except (ValueError, TypeError, KeyError):
+        raise OSError("Unsafe final credential ACL") from None
+
+
+def verify_private_path(path, directory=False):
+    path = safe_path(path, directory=directory)
+    if os.name == "nt":
+        windows_private_path(path, directory=directory)
+    else:
+        info = path.stat()
+        if info.st_uid != os.getuid() or stat.S_IMODE(info.st_mode) & 0o077:
+            raise OSError("Unsafe credential permissions")
+
+
+def private_path(path, directory=False):
+    if os.name == "nt":
+        windows_private_path(path, directory=directory, secure=True)
     else:
         path.chmod(0o700 if directory else 0o600)
 
@@ -96,6 +124,8 @@ class CredentialStore:
             safe_path(self.block_path)
             if not path.exists() and not self.block_path.exists() and self.legacy_path is not None:
                 path = safe_path(self.legacy_path)
+            verify_private_path(path.parent, directory=True)
+            verify_private_path(path)
             value = json.loads(path.read_text(encoding="utf-8"))
             if not isinstance(value, dict) or normalize_base(value.get("base_url")) != normalize_base(base):
                 raise ValueError()
@@ -106,7 +136,7 @@ class CredentialStore:
             if expiry_timestamp(value.get("expires_at")) <= time.time():
                 raise ValueError()
             return value
-        except (OSError, ValueError, TypeError, CliError):
+        except (OSError, ValueError, TypeError, CliError, subprocess.SubprocessError):
             raise auth_required() from None
 
     def _write(self, path, content):

@@ -67,8 +67,7 @@ def api(monkeypatch, tmp_path):
     monkeypatch.setenv("ALETHIC_API_BASE_URL", base)
     monkeypatch.setenv("ALETHIC_CONFIG_DIR", str(tmp_path / "config"))
     store = CredentialStore()
-    store.directory.mkdir()
-    store.path.write_text(json.dumps({"base_url": base, "token": TOKEN, "expires_at": time.time() + 300, "scopes": ["projects:read", "applications:create"]}), encoding="utf-8")
+    store.save(base, {"token": TOKEN, "expires_at": time.time() + 300, "scopes": ["projects:read", "applications:create"]})
     yield {"base": base, "routes": routes, "requests": requests, "store": store, "tmp": tmp_path}
     server.shutdown()
     server.server_close()
@@ -317,7 +316,10 @@ def test_windows_private_acl_uses_current_user_without_logging_token(monkeypatch
     def run(command, **kwargs):
         commands.append(command)
         assert kwargs == {"check": True, "capture_output": True, "text": True}
-        return types.SimpleNamespace(stdout="DOMAIN\\member\n")
+        return types.SimpleNamespace(stdout=json.dumps({
+            "owner": "S-1-5-21-123", "current_user": "S-1-5-21-123", "protected": True,
+            "rules": [{"sid": "S-1-5-21-123", "inherited": False, "type": "Allow", "rights": "FullControl"}],
+        }))
 
     monkeypatch.setattr(credentials, "os", types.SimpleNamespace(name="nt"))
     monkeypatch.setattr(credentials.subprocess, "run", run)
@@ -326,8 +328,43 @@ def test_windows_private_acl_uses_current_user_without_logging_token(monkeypatch
     assert commands[0][:4] == ["powershell.exe", "-NoProfile", "-NonInteractive", "-Command"]
     script = commands[0][4]
     assert "SetAccessRuleProtection($true,$false)" in script
-    assert "GetAccessRules" in script and "$rules.Count -ne 1" in script
+    assert "GetAccessRules" in script and "ConvertTo-Json" in script
     assert "GetOwner" in script and "RemoveAccessRuleSpecific" in script
+
+
+@pytest.mark.parametrize("secure", [False, True])
+@pytest.mark.parametrize("invalid", ["owner", "unprotected", "extra", "empty", "inherited", "foreign", "deny", "read", "malformed"])
+def test_windows_rejects_unsafe_final_acl(monkeypatch, tmp_path, secure, invalid):
+    import types
+    import alethicinsight_cli.credentials as credentials
+
+    actual = {
+        "owner": "S-1-5-21-123", "current_user": "S-1-5-21-123", "protected": True,
+        "rules": [{"sid": "S-1-5-21-123", "inherited": False, "type": "Allow", "rights": "FullControl"}],
+    }
+    if invalid == "owner":
+        actual["owner"] = "S-1-5-21-456"
+    elif invalid == "unprotected":
+        actual["protected"] = False
+    elif invalid == "extra":
+        actual["rules"].append({"sid": "S-1-1-0", "inherited": False, "type": "Allow", "rights": "Read"})
+    elif invalid == "empty":
+        actual["rules"] = []
+    elif invalid == "malformed":
+        actual = {}
+    else:
+        field, value = {"inherited": ("inherited", True), "foreign": ("sid", "S-1-1-0"),
+                        "deny": ("type", "Deny"), "read": ("rights", "Read")}[invalid]
+        actual["rules"][0][field] = value
+
+    def run(command, **kwargs):
+        assert ("SetAccessRuleProtection" in command[4]) is secure
+        return types.SimpleNamespace(stdout=json.dumps(actual))
+
+    monkeypatch.setattr(credentials, "os", types.SimpleNamespace(name="nt"))
+    monkeypatch.setattr(credentials.subprocess, "run", run)
+    with pytest.raises(OSError, match="Unsafe final credential ACL"):
+        credentials.windows_private_path(tmp_path / "credentials.json", secure=secure)
 
 
 def test_posix_permissions_are_private(monkeypatch):
@@ -401,6 +438,9 @@ def test_legacy_fallback_base_binding_explicit_override_and_logout_barrier(tmp_p
     store.legacy_path.parent.mkdir()
     base = "https://example.com/recruitment"
     store.legacy_path.write_text(json.dumps({"base_url": base, "token": TOKEN, "expires_at": time.time() + 300, "scopes": []}))
+    from alethicinsight_cli.credentials import private_path
+    private_path(store.legacy_path.parent, directory=True)
+    private_path(store.legacy_path)
     assert store.load(base)["token"] == TOKEN
     with pytest.raises(CliError):
         store.load("https://other.example")
