@@ -19,6 +19,7 @@
 | POST | `/auth/cli/authorization-requests` | 网页成员；body `request_id, scopes`，返回 `code, expires_at` |
 | POST | `/auth/cli/token` | 无需已有 Bearer；body `request_id, code`，一次性交换，返回 `token, expires_at, scopes` |
 | GET | `/auth/cli/grants` | 网页成员查看本人 grant，分页 |
+| DELETE | `/auth/cli/grants/self` | 仅当前 CLI grant；authoritative 按当前 Bearer token 哈希撤销自身，不接受目标 grant ID；网页 token 返回 403，edge 写入返回 503。成功返回 `{revoked: true}`（鉴权后被并发撤销可返回 `false`）；旧 token 立即失效，重复调用按统一已撤销凭据约定返回 401，不影响同用户或他人的其他 grant |
 | DELETE | `/auth/cli/grants/{id}` | 网页成员撤销本人 grant |
 
 1. CLI 生成随机 `request_id`，告诉用户所需最小 scopes 并引导可信网页授权。

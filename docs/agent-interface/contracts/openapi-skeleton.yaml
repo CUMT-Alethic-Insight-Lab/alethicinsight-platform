@@ -100,6 +100,28 @@ paths:
                       items: {type: array, items: {$ref: '#/components/schemas/Grant'}}
         '401': {$ref: '#/components/responses/Unauthorized'}
         '403': {$ref: '#/components/responses/Forbidden'}
+  /auth/cli/grants/self:
+    delete:
+      operationId: revokeCurrentCliGrant
+      summary: Revoke only the current CLI Bearer grant
+      x-cli-only: true
+      description: >-
+        Authoritative-only write. Selects the current grant by Bearer token hash;
+        accepts no target grant ID. Web sessions are forbidden. Once revoked,
+        the token is immediately invalid; retries with it return the standard 401.
+      responses:
+        '200':
+          description: Current grant revoked; false if concurrently revoked after authentication; no-store
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [revoked]
+                properties:
+                  revoked: {type: boolean}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '503': {description: Edge rejects organization writes; Retry-After header}
   /auth/cli/grants/{id}:
     parameters: [{$ref: '#/components/parameters/Id'}]
     delete:

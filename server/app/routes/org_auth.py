@@ -124,6 +124,28 @@ def grants(request: Request, response: Response,
             "next_cursor": rows[limit - 1]["id"] if len(rows) > limit else None}
 
 
+@router.delete("/grants/self")
+def revoke_self(request: Request, response: Response):
+    identity = require_org_identity(request)
+    if identity.auth_type != "cli":
+        raise HTTPException(status_code=403, detail="此操作仅允许 CLI 授权")
+    token_hash = digest(auth.bearer_token(request))
+    with db.connection() as conn:
+        changed = conn.execute(
+            "UPDATE org_cli_grant SET revoked_at = ?"
+            " WHERE token_hash = ? AND principal_id = ? AND revoked_at IS NULL",
+            (auth._utcnow().isoformat(), token_hash, identity.principal_id),
+        ).rowcount
+        if changed:
+            grant_id = conn.execute(
+                "SELECT id FROM org_cli_grant WHERE token_hash = ? AND principal_id = ?",
+                (token_hash, identity.principal_id),
+            ).fetchone()["id"]
+            auth.write_audit(conn, identity.principal_id, "cli_revoke", grant_id)
+    private_response(response)
+    return {"revoked": bool(changed)}
+
+
 @router.delete("/grants/{grant_id}")
 def revoke(grant_id: str, request: Request):
     identity = require_org_identity(request, web_only=True)
