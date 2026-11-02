@@ -52,6 +52,10 @@ authoritative/edge 必须保持单一权威：旧 edge 机试暂存转发只适�
 
 ```sh
 python -m pip install ./infra/interface/alethicinsight-cli
+# 系统临时目录必须位于仓库外；每次演练新建，不复用任何已有凭据目录。
+export ALETHICINSIGHT_CONFIG_DIR="$(python -c 'from pathlib import Path; import tempfile; root = Path.cwd().resolve(); base = Path(tempfile.gettempdir()).resolve(); assert base != root and root not in base.parents, "系统临时目录必须位于仓库外"; print(tempfile.mkdtemp(prefix="alethicinsight-mvp-", dir=base))')"
+# 创建失败则停止，避免回退到默认/历史凭据目录；不要读取或复制凭据文件。
+test -n "$ALETHICINSIGHT_CONFIG_DIR" || exit 1
 export ALETHICINSIGHT_API_BASE_URL=http://127.0.0.1:8901
 alethicinsight-cli --help
 alethicinsight-cli auth login
@@ -93,7 +97,7 @@ alethicinsight-cli applications draft --file application.json --json
 alethicinsight-mcp --help
 ```
 
-MCP Host 的本地 stdio 配置示例（实际配置文件结构取决于 Host；路径需换为本地 venv 的绝对路径）：
+MCP Host 的本地 stdio 配置示例（实际配置文件结构取决于 Host；可执行文件路径需换为本地 venv 的绝对路径）。将 `ALETHICINSIGHT_CONFIG_DIR` 占位值替换为**第 3 节首次登录前新建的同一隔离目录的绝对路径**，不得使用默认、历史或其他已有凭据目录；不要为 Host 另建目录，否则无法使用刚才的本地授权。JSON 不会展开 `$ALETHICINSIGHT_CONFIG_DIR`，应由操作者在本地填写路径，不读取凭据内容：
 
 ```json
 {
@@ -101,13 +105,16 @@ MCP Host 的本地 stdio 配置示例（实际配置文件结构取决于 Host�
     "alethicinsight": {
       "command": "/absolute/path/to/venv/bin/alethicinsight-mcp",
       "args": ["--cli", "/absolute/path/to/venv/bin/alethicinsight-cli"],
-      "env": {"ALETHICINSIGHT_API_BASE_URL": "http://127.0.0.1:8901"}
+      "env": {
+        "ALETHICINSIGHT_API_BASE_URL": "http://127.0.0.1:8901",
+        "ALETHICINSIGHT_CONFIG_DIR": "/absolute/path/to/the-new-isolated-directory-from-section-3"
+      }
     }
   }
 }
 ```
 
-Windows 对应 `Scripts/alethicinsight-mcp.exe` 和 `Scripts/alethicinsight-cli.exe`。这里不在环境参数写 token；适配器通过同一用户 CLI 凭据调用 API。不要将非可信程序或 shell 字符串作为 `--cli`。不要把它启动为远程 HTTP 服务；stdio 的 stdout 专供 JSON-RPC，不手工混入日志。工具只允许发现/读取和准备待网页确认草稿，不包含确认签发、最终提交、review、SQL、shell 或任意 URL 抓取。
+Windows 对应 `Scripts/alethicinsight-mcp.exe` 和 `Scripts/alethicinsight-cli.exe`；目录路径可写为 `C:/Users/.../AppData/Local/Temp/alethicinsight-mvp-...`，须使用实际生成值。这里不在环境参数写 token；适配器通过同一用户、同一隔离目录的 CLI 凭据调用 API。不要将非可信程序或 shell 字符串作为 `--cli`。不要把它启动为远程 HTTP 服务；stdio 的 stdout 专供 JSON-RPC，不手工混入日志。工具只允许发现/读取和准备待网页确认草稿，不包含确认签发、最终提交、review、SQL、shell 或任意 URL 抓取。
 
 本地协议自动测试不等于实际 MCP Host 接入成功，也不代表 MCP 所有版本均兼容。支持版本和参数以 `infra/interface/alethicinsight-cli/` 内的实现、`--help` 及实际握手为准；真实客户端名称/版本/结果需另行记录。
 
@@ -148,7 +155,7 @@ python server/scripts/sync_org_knowledge.py --local-dir /path/to/reviewed/govern
 | 离机备份/隔离恢复 | 待演练 |
 | 生产发布/反代/TLS | 配置已入 PR，未执行生产部署、nginx reload 或线上验证 |
 
-本次文档检查（2026-11-02）：使用仓库根的临时内联 Python 检查根 README、本手册、两份边界/迁移文档及 `docs/agent-interface/` 的全部 Markdown，共 20 个文件、41 个本地链接目标均存在；旧命令、错误发行拼写与未实现命令示例检查通过。`git diff --check` 通过。本次没有运行后端全量测试、构建/安装单包、实测 Host 或部署生产；不修改此前全量测试结果，最终记录由主代理统一核验更新。
+本次文档检查（2026-11-02）：使用仓库根的临时内联 Python 检查根 README、本手册、两份边界/迁移文档及 `docs/agent-interface/` 的全部 Markdown，共 20 个文件、44 个本地链接目标均存在；旧命令、错误发行拼写与未实现命令示例检查通过，MCP JSON 包含与首次登录共用的隔离目录配置。`git diff --check` 通过。README 的子 shell 保持仓库根工作目录，考生端测试为 311 passed；本次后端执行出现凭据校验与 SQLite 缺表失败，不据此宣称全量通过，最终结果由主代理统一复核。本次未构建/安装单包、实测 Host 或部署生产，不修改此前历史测试结果。
 
 ## 7. 备份与隔离恢复（人工操作方案）
 

@@ -34,15 +34,14 @@ This repository is public so that candidates can **audit the session-cleaning co
 
 ## Tests · 测试
 
+从仓库根连续执行；括号中的子 shell 不改变当前终端目录。
+
 ```bash
 # Server / 服务端
-cd server
-pip install -r requirements.txt
-python -m pytest tests -q
+(cd server && python -m pip install -r requirements.txt && python -m pytest tests -q)
 
 # Exam kit / 考生端
-cd exam_kit
-python -m pytest -q
+(cd exam_kit && python -m pytest -q)
 ```
 
 ## Download · 机试包下载
