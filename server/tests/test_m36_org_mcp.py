@@ -284,6 +284,10 @@ def test_real_cli_against_loopback_http_uses_no_credentials_in_mcp(tmp_path, mon
     (configuration / "credentials.json").write_text(json.dumps({
         "base_url": base, "token": synthetic_token, "expires_at": 4102444800,
         "scopes": ["knowledge:read", "applications:create"]}), encoding="utf-8")
+    sys.path.insert(0, str(ADAPTER))
+    from alethicinsight_cli.credentials import private_path
+    private_path(configuration, directory=True)
+    private_path(configuration / "credentials.json")
     monkeypatch.setenv("ALETHIC_API_BASE_URL", base)
     monkeypatch.setenv("ALETHIC_CONFIG_DIR", str(configuration))
     fields = {"project_id": "p-local", "motivation": "I want to work on this project", "weekly_hours": 4}
@@ -313,7 +317,74 @@ def test_default_runner_uses_current_interpreter_and_new_environment_allowlist()
     from alethicinsight_cli import __version__
     from alethicinsight_mcp import __version__ as mcp_version
 
-    assert CliRunner().command == (sys.executable, "-m", "alethicinsight_cli")
+    assert CliRunner().command == (sys.executable, "-I", "-X", "utf8", "-m", "alethicinsight_cli")
     assert {"ALETHICINSIGHT_API_BASE_URL", "ALETHICINSIGHT_CONFIG_DIR", "ALETHIC_CONFIG_DIR"} <= SAFE_ENV
     assert "PYTHONPATH" not in SAFE_ENV
     assert __version__ == mcp_version
+
+
+def test_explicit_trusted_cli_override_is_preserved(monkeypatch, tmp_path):
+    sys.path.insert(0, str(ADAPTER))
+    from alethicinsight_mcp import __main__ as entrypoint
+
+    trusted = str(tmp_path / "trusted-cli.exe")
+    runners = []
+    monkeypatch.setattr(sys, "argv", ["alethicinsight-mcp", "--cli", trusted])
+    monkeypatch.setattr(entrypoint, "serve", runners.append)
+    entrypoint.main()
+    assert runners[0].command == (trusted,)
+
+
+@pytest.fixture(scope="module")
+def installed_python(tmp_path_factory):
+    import shutil
+    import venv
+
+    directory = tmp_path_factory.mktemp("m36-installed")
+    source = directory / "source"
+    shutil.copytree(ADAPTER, source, ignore=shutil.ignore_patterns(
+        "__pycache__", "*.egg-info", "build", "dist"))
+    wheels = directory / "wheels"
+    result = subprocess.run([
+        sys.executable, "-m", "pip", "wheel", "--no-deps", "--no-index",
+        "--no-build-isolation", "--wheel-dir", str(wheels), str(source),
+    ], capture_output=True, text=True, timeout=120)
+    assert result.returncode == 0, result.stdout + result.stderr
+    environment = directory / "venv"
+    venv.EnvBuilder(with_pip=True).create(environment)
+    python = environment / ("Scripts/python.exe" if os.name == "nt" else "bin/python")
+    result = subprocess.run([
+        str(python), "-m", "pip", "install", "--no-index", "--no-deps",
+        str(next(wheels.glob("*.whl"))),
+    ], capture_output=True, text=True, timeout=120)
+    assert result.returncode == 0, result.stdout + result.stderr
+    return python
+
+
+@pytest.mark.parametrize("shadow_kind", ["module", "package"])
+def test_installed_default_runner_never_executes_cwd_shadow(
+        installed_python, tmp_path, shadow_kind):
+    marker = tmp_path / "shadow-executed"
+    attack = f"from pathlib import Path; Path({str(marker)!r}).touch()\nprint('{{}}')\n"
+    if shadow_kind == "module":
+        (tmp_path / "alethicinsight_cli.py").write_text(attack, encoding="utf-8")
+    else:
+        package = tmp_path / "alethicinsight_cli"
+        package.mkdir()
+        (package / "__init__.py").write_text(attack, encoding="utf-8")
+        (package / "__main__.py").write_text(attack, encoding="utf-8")
+    environment = dict(os.environ)
+    environment.update(ALETHICINSIGHT_CONFIG_DIR=str(tmp_path / "empty-config"),
+                       ALETHICINSIGHT_API_BASE_URL="http://127.0.0.1:1",
+                       PYTHONPATH=str(tmp_path))
+    wire = "".join(json.dumps(message) + "\n" for message in (
+        INITIALIZE, READY, call("org_capabilities")))
+    result = subprocess.run([
+        str(installed_python), "-I", "-m", "alethicinsight_mcp",
+    ], input=wire, capture_output=True, text=True, cwd=tmp_path,
+        env=environment, timeout=20)
+    assert result.returncode == 0, result.stderr
+    assert result.stderr == ""
+    responses = [json.loads(line) for line in result.stdout.splitlines()]
+    assert tool_data(responses[-1])["error"]["code"] == "AUTH_REQUIRED"
+    assert not marker.exists()

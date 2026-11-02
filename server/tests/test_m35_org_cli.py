@@ -267,11 +267,23 @@ def test_executable_module_json_contract(api):
     assert TOKEN not in result.stdout + result.stderr
 
 
-@pytest.mark.parametrize("url", ["http://example.com", "https://user:pass@example.com", "https://example.com?token=bad", "file:///tmp/test"])
+@pytest.mark.parametrize("url", [
+    "http://example.com", "https://user:pass@example.com", "file:///tmp/test",
+    *[base + suffix for base in ("https://example.com/recruitment", "http://127.0.0.1:8080")
+      for suffix in ("?", "?token=bad", "#", "#fragment", "?#")],
+])
 def test_rejects_untrusted_or_credential_bearing_base_urls(url):
     with pytest.raises(CliError) as exc:
         normalize_base(url)
     assert exc.value.exit_code == 2
+
+
+@pytest.mark.parametrize("base", [
+    "https://example.com/recruitment", "http://localhost:8080/recruitment",
+    "http://127.0.0.1:8080/recruitment", "http://[::1]:8080/recruitment",
+])
+def test_valid_https_and_loopback_bases_remain_supported(base):
+    assert normalize_base(base + "/") == base
 
 
 def test_limit_bounds_fail_before_http(api):

@@ -36,8 +36,8 @@ def normalize_base(value):
         or not parts.hostname
         or parts.username is not None
         or parts.password is not None
-        or parts.query
-        or parts.fragment
+        or "?" in value
+        or "#" in value
         or (parts.scheme == "http" and parts.hostname not in {"localhost", "127.0.0.1", "::1"})
     ):
         raise CliError("INVALID_ARGUMENT", "API base must be HTTPS (HTTP is allowed only for loopback testing).", 2)

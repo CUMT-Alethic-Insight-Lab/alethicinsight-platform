@@ -162,7 +162,7 @@ def tool_error(code, message):
 
 @dataclass
 class CliRunner:
-    command: tuple[str, ...] = (sys.executable, "-m", "alethicinsight_cli")
+    command: tuple[str, ...] = (sys.executable, "-I", "-X", "utf8", "-m", "alethicinsight_cli")
     timeout: float = 15.0
 
     def call(self, name, arguments):
