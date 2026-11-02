@@ -164,6 +164,11 @@ def lookup_session(conn: sqlite3.Connection, token: str) -> sqlite3.Row | None:
     if row["expires_at"] <= _utcnow().isoformat():
         conn.execute("DELETE FROM login_session WHERE token_hash = ?", (token_hash,))
         return None
+    acct = conn.execute(
+        "SELECT role FROM account WHERE student_id = ?", (row["student_id"],)
+    ).fetchone()
+    if acct is None or acct["role"] != row["kind"]:
+        return None
     return row
 
 

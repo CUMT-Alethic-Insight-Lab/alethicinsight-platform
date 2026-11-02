@@ -16,6 +16,7 @@
   若使用 Cloudflare Pages/Worker 前置代理，也须放行 `/login`、`/account` 及其尾斜杠版本，
   同时继续回源 `/recruitment/*` 和 `/admin/recruitment`，不能让 Pages 的 SPA fallback 吞掉账号页。
   Pages 配置在官网独立仓，须随官网发布同步核验。
+- 组织接口：`/recruitment/api/v1/` 的读写始终回源 lab authoritative，不启用 cloud edge 热备回落；edge 应用层也拒写，避免主体、授权和事务双写。成员网页为 `/recruitment/org`，正式提交/审批响应禁止 iframe 嵌套。
 - 线上真实 vhost 快照：`nginx-alethicinsight.vhost.conf`（云端 `/etc/nginx/sites-available/alethicinsight`
   的 2026-10-16 存档，含 lab_origin 长连接池与热备回落；改线上 nginx 时同步更新此文件）
 - 数据目录：`/var/www/recruitment/data`（sqlite，跨 release 持久，属主 www-data）

@@ -8,7 +8,7 @@ from fastapi.testclient import TestClient
 
 from app import auth, config, db
 from app.studentid import parse_student_id
-from conftest import ADMIN_TEST_PASSWORD, applicant_headers, change_password, ensure_admin_password_changed
+from conftest import ADMIN_TEST_PASSWORD, admin_login, applicant_headers, change_password, ensure_admin_password_changed
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 

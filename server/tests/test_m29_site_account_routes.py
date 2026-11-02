@@ -93,3 +93,10 @@ def test_nginx_site_accounts_reuse_legacy_proxy_chain(name):
         assert f"return 301 /{path}$is_args$args;" in text
     assert "location ^~ /recruitment/" in text
     assert "proxy_pass" in text
+
+
+def test_nginx_org_api_keeps_namespace_without_standby_fallback():
+    text = (ROOT / "deploy" / "nginx-alethicinsight.vhost.conf").read_text(encoding="utf-8")
+    location = text.split("location ^~ /recruitment/api/v1/ {", 1)[1].split("}", 1)[0]
+    assert "proxy_pass https://lab_origin/api/v1/;" in location
+    assert "error_page" not in location

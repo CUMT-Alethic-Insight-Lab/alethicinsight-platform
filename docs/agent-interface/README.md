@@ -55,10 +55,10 @@
 
 ## 最小用户旅程
 
-1. 成员 `alethic auth login`，经官网身份验证并对 CLI 授权。
-2. 在终端运行 `alethic projects list --json`，或让个人 Agent 调用 `alethic mcp serve` 暴露的工具。
-3. 成员说“我想申请一块开发板”，Agent 读取表单定义，生成**待确认草稿**。
-4. 成员确认后客户端提交申请；平台校验身份、权限、资源和必填字段，记录审计信息。
+1. 成员 `alethicinsight-cli auth login`，经官网身份验证并对 CLI 授权。
+2. 在终端运行 `alethicinsight-cli projects list --json`，或由 Host 启动同包的 `alethicinsight-mcp --cli alethicinsight-cli` 调用受限工具。
+3. 成员选择项目，Agent 读取 `project-join` 表单并生成**待确认草稿**；设备借用等表单仍为后续设计，不是当前可执行流程。
+4. 成员在可信网页核对并最终提交；CLI/MCP 只能准备草稿。平台校验身份、权限、项目和必填字段，记录审计信息。
 5. 审批由有权的实际负责人完成；成员通过 UI/CLI/Agent 查询状态。
 6. 即使模型 API 断连，网页表单与 CLI/REST 仍可使用。
 
@@ -72,6 +72,10 @@
 - `open-onboarding`：公开的学习、协作和 Agent 接入说明，不存内部凭据/真实成员记录。
 - `awesome-ai`：学习材料索引，不管理社团申请。
 - `governance-public`：公开的正式组织章程与规则；本平台从中引用，不自动创造规则。
-- `recruitment-exam-platform`：现有 FastAPI/SQLite 业务平台与本方案文档；后续 API、CLI/MCP 适配器优先在此渐进扩展，是否拆分新仓由实际模块边界决定。私有配置、密钥和真实成员数据不进入仓库。
+- infra：公共业务基础设施与接口；CLI/MCP 统一位于 `infra/interface/alethicinsight-cli/`，单仓单发行包单版本，发行名 `alethicinsight-cli`，入口为 `alethicinsight-cli` / `alethicinsight-mcp`。不另建 MCP 仓，不以本次整理为由拆分 exam-kit。
+- `infra-handoff`：仅私有运维资料，不存公共接口源码；真实凭据、成员记录、考生数据不进入公共仓。
+- `Alethic-Insight-Frontend-Templates`：本次完全不改；`E:/projects/Aletheion` 仅为历史来源，不作为 monorepo。
 
-> **交付定义：** 文档是一个 Coding Agent 能按 PR 分段实现的工程规范草案；其中所有示例路径、CLI 命令、API 均为拟议接口，不代表现有网站已具备。
+详见[仓库边界](../REPOSITORY_BOUNDARIES.md)与[工作区迁移清单](../WORKSPACE_MIGRATION.md)。
+
+> **事实边界：** 本目录保留长期设计，当前可执行命令与限制以 [MVP 手册](../AGENT_INTERFACE_MVP.md)及 [CLI/MCP 说明](docs/05-cli-mcp-skills.md)为准。未部署生产，真实 Agent Host 兼容性需要单独验证。
