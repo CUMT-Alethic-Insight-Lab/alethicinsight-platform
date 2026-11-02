@@ -4,6 +4,7 @@
 # 必填环境变量：
 #   LAB_HOST=<user@host>   实验室内网部署目标（真实地址见 org 私有仓 infra-handoff）
 #   SSH_KEY=<私钥路径>     部署用 SSH 私钥
+#   EXAM_KIT_DIR=<绝对路径> 独立 recruitment-exam-kit 检出目录
 # 小主机需已装好 python3-venv / nginx / cloudflared（一次性初始化见 deploy/README.md）。
 set -euo pipefail
 
@@ -13,6 +14,16 @@ HOST="${LAB_HOST:?请先设置 LAB_HOST=user@host}"
 SSH_OPTS=(-o ConnectTimeout=10 -o StrictHostKeyChecking=accept-new)
 KEY="${SSH_KEY:?请先设置 SSH_KEY=私钥路径}"
 if [ -f "$KEY" ]; then SSH_OPTS+=(-i "$KEY"); fi
+
+KIT_DIR="${EXAM_KIT_DIR:?请先设置 EXAM_KIT_DIR=独立 recruitment-exam-kit 的绝对路径}"
+case "$KIT_DIR" in
+  /*|[A-Za-z]:/*) ;;
+  *) echo "ERROR: EXAM_KIT_DIR 必须为绝对路径" >&2; exit 1 ;;
+esac
+if [ ! -f "$KIT_DIR/session_receiver.py" ]; then
+  echo "ERROR: EXAM_KIT_DIR 中缺少 session_receiver.py" >&2
+  exit 1
+fi
 
 cd "$(dirname "$0")/.."
 
@@ -44,7 +55,7 @@ ssh "${SSH_OPTS[@]}" "$HOST" "
 "
 
 echo "[4/6] push session_receiver.py"
-tar czf - -C ../exam_kit session_receiver.py | \
+tar czf - -C "$KIT_DIR" session_receiver.py | \
   ssh "${SSH_OPTS[@]}" "$HOST" "mkdir -p /srv/alethic/receiver /srv/alethic/received_sessions && tar xzf - -C /srv/alethic/receiver"
 
 echo "[5/6] switch current symlink + restart services"

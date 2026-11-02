@@ -1,7 +1,7 @@
 """cleaned.jsonl → Markdown 报告转换（纯标准库）。
 
 管理端「下载 MD」的服务端实现：把存储在云端的 cleaned.jsonl（NDJSON，
-每行 {k, time, ...}）重建为人读的 Markdown，与 exam_kit/cleaner.py 生成的
+每行 {k, time, ...}）重建为人读的 Markdown，与 recruitment-exam-kit 的 cleaner.py 生成的
 cleaned.md 同构（👤 用户 / 🤖 助手 / 🔧 工具分轮小节 + 🧩 代理分节）。
 上传的 jsonl 已剥掉下划线内部字段（无 _q），搜索类工具的关键词从 arg 读取。
 """
@@ -13,7 +13,7 @@ import re
 from datetime import datetime, timezone
 from pathlib import Path
 
-# 搜索/检索/联网获取类工具识别（与 exam_kit/cleaner.py 规则一致）：
+# 搜索/检索/联网获取类工具识别（与 recruitment-exam-kit 的 cleaner.py 规则一致）：
 # 工具名规范化（去 -_. 转小写）后命中任一子串即视为搜索类。
 SEARCH_NAME_HINTS = ("search", "fetch", "browse", "web", "datasource")
 SEARCH_EXACT_NAMES = {"tavily"}
