@@ -35,7 +35,7 @@ python -m uvicorn app.main:app --app-dir server --host 127.0.0.1 --port 8901
 
 ## 内部成员平台：独立安装与使用
 
-在另一个终端、另一个虚拟环境中按 [成员平台 README](member-platform/README.md) 启动 `member-platform/server`，本地示例服务根为 **`http://localhost:8902`**，网页入口为 `/org`。CLI/MCP 从成员平台自己的 infra 安装，显式设置服务根，不使用考试 `/recruitment` 地址：
+在另一个终端、另一个虚拟环境中按 [成员平台 README](member-platform/README.md) 使用 **`MEMBER_PLATFORM_*`** 配置：独立 DATA_DIR/DB_PATH、首次生成并妥善保留的独立 SECRET_KEY，显式执行空库管理员 bootstrap，再从 `member-platform/server` 启动 uvicorn。成员服务不读取考试 `ALE_THIC_*` 或 `SECRET_KEY`；重启必须恢复同一成员密钥，不重新生成或 bootstrap。本地示例服务根为 **`http://localhost:8902`**，先在 `/login` 以 bootstrap 账号登录并改密，再进入 `/org`。CLI/MCP 从成员平台自己的 infra 安装，显式设置服务根，不使用考试 `/recruitment` 地址：
 
 ```sh
 python -m pip install ./member-platform/infra/interface/alethicinsight-cli
@@ -57,7 +57,7 @@ alethicinsight-mcp --help
 | 权限 | 招新报名、考试、评审门禁 | member/admin、scope、资源 ACL、可信网页确认 |
 | 生命周期 | 按招新批次、清洗件与考试归档策略 | 按成员、项目、事务、知识与审计策略 |
 
-不得把两个进程指向同一个 SQLite 文件或复制对方的会话/凭据。即使配置键名或 API 登录路径相同，也不代表共享身份源。既有真实成员账号如何从历史混合库迁出尚待单独审批与验证；本次不迁移真实数据、不部署生产。
+不得把两个进程指向同一个 SQLite 文件或复制对方的会话/凭据。考试配置为 `ALE_THIC_*`/`SECRET_KEY`，成员配置只读 `MEMBER_PLATFORM_*`；相同 API 登录路径也不代表共享身份源。既有真实成员账号如何从历史混合库迁出尚待单独审批与验证；本次不迁移真实数据、不部署生产。
 
 ## 开发与验证
 

@@ -16,12 +16,12 @@ python -m pip install ./member-platform/infra/interface/alethicinsight-cli
 
 ```sh
 # POSIX shell：仅本地示例，不是线上地址
-export ALETHICINSIGHT_API_BASE_URL=http://127.0.0.1:8000
+export ALETHICINSIGHT_API_BASE_URL=http://localhost:8902
 ```
 
 ```powershell
 # PowerShell：仅本地示例，不是线上地址
-$env:ALETHICINSIGHT_API_BASE_URL = 'http://127.0.0.1:8000'
+$env:ALETHICINSIGHT_API_BASE_URL = 'http://localhost:8902'
 ```
 
 ```sh

@@ -23,17 +23,26 @@ python -m venv .venv-member
 # Windows Git Bash；Linux 使用 source .venv-member/bin/activate
 source .venv-member/Scripts/activate
 python -m pip install -r member-platform/server/requirements.txt
-export ALE_THIC_DATA_DIR="$PWD/.local-member"
-export ALE_THIC_DB_PATH="$ALE_THIC_DATA_DIR/member.db"
-export ALE_THIC_ROLE=authoritative
-export PUBLIC_PREFIX=''
-export SECRET_KEY="$(python -c 'import secrets; print(secrets.token_urlsafe(32))')"
-python -m uvicorn app.main:app --app-dir member-platform/server --host 127.0.0.1 --port 8902
+export MEMBER_PLATFORM_DATA_DIR="$PWD/.local-member"
+export MEMBER_PLATFORM_DB_PATH="$MEMBER_PLATFORM_DATA_DIR/member.db"
+export MEMBER_PLATFORM_ROLE=authoritative
+export MEMBER_PLATFORM_PUBLIC_PREFIX=''
+# 仅首次初始化生成：在受控秘密管理位置保留，重启必须恢复同一值
+export MEMBER_PLATFORM_SECRET_KEY="$(python -c 'import secrets; print(secrets.token_urlsafe(48))')"
+(cd member-platform/server && python scripts/bootstrap_member.py --student-id local-owner)
 ```
 
-沿用配置键名不等于继承考试配置。只允许新建开发目录，不指向 `server/data`、考试 `.local-exam`、生产镜像或备份。临时密钥不落盘、不打印、不上线；初始化管理员与密码变更遵循成员应用提示，仅创建合成账号，不复制真实成员。提交前检查状态，禁止提交 DB/WAL、凭据、日志。
+bootstrap 交互读取两次唯一临时管理员密码（不少于 12 字符），只允许空成员库执行，不通过参数/文件传密码。没有默认管理员、默认密码或自助注册。初始化成功后，同一终端执行：
 
-另一个终端访问 `http://localhost:8902/org` 与 `http://localhost:8902/openapi.json`。隔离应用负责注册 org router、最小成员网页登录与成员表初始化，不加载考试报名、交卷、staging、归档或批次回收。`/org` 禁止 iframe 嵌套，组织错误保持 envelope/request_id。成员服务即使保留 `ALE_THIC_ROLE` 兼容配置，也不能借此挂载考试 edge 功能；生产拓扑另审。
+```sh
+(cd member-platform/server && python -m uvicorn app.main:app --host 127.0.0.1 --port 8902)
+```
+
+成员配置只读取 `MEMBER_PLATFORM_*`；旧 `ALE_THIC_*`、`SECRET_KEY` 不作为配置来源。独立成员密钥必须不少于 32 字符且不同于考试密钥，**首次生成后必须保留，重启恢复同一值**以及相同 DATA_DIR/DB_PATH，再只执行 uvicorn。不重新生成密钥、不重做 bootstrap；更换密钥会使已有密码验证失败。密钥存受控秘密管理位置，不打印、提交、粘贴给 Agent。PowerShell 与全部配置见 [成员服务 README](../member-platform/server/README.md)。
+
+只允许新建开发目录，不指向 `server/data`、考试 `.local-exam`、生产镜像或备份，不复制真实成员。成员应用工作目录为 `member-platform/server`，不设置指向根考试应用的 `PYTHONPATH`。提交前检查状态，禁止提交 DB/WAL、凭据、日志。
+
+先访问 `http://localhost:8902/login`，以显式 bootstrap 的 `local-owner` 和临时密码登录，**必须先改密**才能查询组织 API/管理成员；再进入 `/org`。`/openapi.json` 是运行时契约。隔离应用不加载考试报名、交卷、staging、归档或批次回收；`/org` 禁止 iframe 嵌套，组织错误保持 envelope/request_id。成员实例角色用 `MEMBER_PLATFORM_ROLE`，不是 `ALE_THIC_ROLE`；生产拓扑另审。
 
 同时运行考试服务的命令见[根 README](../README.md)。双服务的 DB 路径、虚拟环境、数据目录和配置值必须不同；不能以两个端口共用同一库假装独立。
 
@@ -52,19 +61,19 @@ alethicinsight-cli auth login
 alethicinsight-cli auth status --json
 alethicinsight-cli projects list --recruiting --limit 20 --json
 alethicinsight-cli knowledge search '成员' --json
-alethicinsight-cli forms schema project-join --json
 alethicinsight-cli applications list --mine --limit 20 --json
 ```
 
 新配置使用 `ALETHICINSIGHT_API_BASE_URL` 与 `ALETHICINSIGHT_CONFIG_DIR`；旧 `ALETHIC_API_BASE_URL`、`ALETHIC_BASE_URL`、`ALETHIC_CONFIG_DIR` 仅兼容。显式服务根不能省略，不依赖旧考试 URL 默认值。`/api/v1/auth/cli/*` 路由不因移动包目录更名。
 
-CLI 随机 request_id，引导可信成员 `/org?cli_request=...`。用户核对 scopes 后取一次性 code，在 CLI 隐藏提示输入；密码、网页 token、code、CLI token 和确认 token 不进 Agent 上下文。默认只读，草稿需明确授权：
+CLI 随机 request_id，引导可信成员 `/org?cli_request=...`。用户核对 scopes 后取一次性 code，在 CLI 隐藏提示输入；密码、网页 token、code、CLI token 和确认 token 不进 Agent 上下文。默认授权只读，**读取 forms schema 与校验/草稿一样，需要 `applications:create`**，不是只读登录后的可用命令。本人准备申请时先重新明确授权，完成网页同意与 CLI 交换后再查 schema，不放宽服务端权限：
 
 ```sh
 alethicinsight-cli auth login --scope profile:read:self --scope applications:create --scope applications:read:self --scope projects:read
+alethicinsight-cli forms schema project-join --json
 ```
 
-先读 schema，再准备本地脱敏 `application.json`，project_id/revision 以实际返回为准：
+新的 login scope 列表不会与旧 grant 自动合并；仍需知识查询时显式加 `--scope knowledge:read`。读到当前 schema 后，再准备本地脱敏 `application.json`，project_id/revision 以实际返回为准：
 
 ```json
 {"kind":"project-join","form_revision":"1","fields":{"project_id":"LOCAL_TEST_PROJECT_ID","motivation":"希望参与本地测试项目并验证加入流程","weekly_hours":4,"notes":"仅本地演练"}}
@@ -130,12 +139,25 @@ python member-platform/server/scripts/sync_org_knowledge.py --local-dir /path/to
 python -m pip wheel --no-deps ./member-platform/infra/interface/alethicinsight-cli --wheel-dir /path/to/new-temporary-wheel-dir
 ```
 
-本页先给命令，不编造通过数；当前文档工作未运行应用测试。集成交接须记录 commit、系统/依赖、实际命令、退出状态、失败和跳过。验证还包括：
+本页先给命令，不编造通过数；本次教程复核未运行两套全量 pytest，实际启动/HTTP/CLI 结果见下方。集成交接须记录 commit、系统/依赖、实际命令、退出状态、失败和跳过。完整验收还包括：
 
 - 考试进程不挂载 `/org` 或组织 `/api/v1`；成员进程不挂载考试业务或运行考试维护任务。
 - 双空库、合成账号同时启动，账号与 session/grant 不跨产品生效，管理员权限不继承；任何一套初始化/维护不改变另一套 DB。
 - 成员真实 HTTP + 实际 CLI/MCP 子进程闭环、撤权/草稿确认/幂等与权限负例；干净 wheel 安装和两个入口。
 - YAML 解析、内部 `$ref`、operationId/路径参数、本地 Markdown 链接检查，成员 `/openapi.json` 与人工契约对照。
+
+### 2026-11-04 集成教程复核
+
+Windows / Python 3.14，在仓库外创建新的成员 venv 与合成成员库，执行 `python -m pip install -r member-platform/server/requirements.txt`；CLI 从当前源码的临时副本安装，避免在源码树留下构建产物，两个已安装入口 `--help` 均退出 0。成员进程使用本手册 `MEMBER_PLATFORM_*`，工作目录为成员 server，执行 `python -m uvicorn app.main:app --host 127.0.0.1 --port 8902`（验证时另加 `--no-access-log`）。结果：
+
+- 执行未修改的 `scripts/bootstrap_member.py --student-id local-owner` 原入口，合成密码输入两次，初始化成功。工具终端没有 Windows 交互控制台，原生 getpass 管道探针超时；本次以 runpy 执行原脚本 main、包装 stdin 触发标准库非控制台输入，不算交互隐藏输入验收，教程仍要求用户在真实终端交互输入。
+- 真实 HTTP `/login`、`/org`、`/openapi.json` 返回 200；bootstrap 管理员登录后未改密查询 `/api/v1/me` 为 403，改密后为 200；创建合成成员、成员登录/强制改密与项目查询成功。
+- 停止再以同一 DB/成员密钥启动，管理员和成员的新密码仍能登录，成员查询成功。密钥仅在本次临时演练进程内保留，未读取或写入生产秘密。
+- 已安装 CLI 显式指向 `http://localhost:8902` 与新私有临时配置目录：非交互 login 退出 3、授权 URL 指向 8902；通过真实 HTTP 自动化成员授权码/交换接口，用包自带 CredentialStore 保存合成 grant，而不是在浏览器人工登录。
+- 默认只读 grant 的 `auth status`、projects/knowledge/本人 applications 查询退出 0；forms schema 退出 4（权限拒绝）。显式授予 `applications:create` 后 forms schema 退出 0；logout 确认 `server_revoked: true`。未放宽权限。
+- 考试另建 venv，安装 `server/requirements.txt`，使用另一空开发库与独立密钥启动 8901；不跟随重定向的 `GET /` 返回 200，`HEAD /` 返回 405，故[部署验证](../server/deploy/README.md)必须使用 GET，不能用 `curl -I` 声称 200。首次额外考试探针因误用只含成员依赖的环境缺 captcha 失败，改用完整独立考试环境后通过，不修改应用代码。
+
+本次验证进程全部停止，临时环境/DB/凭据已删除。未运行全量 pytest、真实浏览器点击或真实 Agent Host，也未执行生产部署、真实账号/知识迁移；HTTP 自动化不是人工网页确认验收。
 
 原 451/566/311 等历史数字移至 [migration.md](migration.md)，不当作隔离后的验收。真实浏览器、两种真实 Agent Host、独立 POSIX 主机、目标硬件、离机备份/恢复、TLS/反代和生产发布各自待验，不能用协议测试代替。
 

@@ -184,7 +184,7 @@ sudo systemctl enable --now alethic-recruitment-forward.timer
 
 ```bash
 curl -s https://<主站域名>/recruitment/api/health
-curl -sI https://<主站域名>/recruitment/          # 空库时应 302 到管理端
+curl -s -o /dev/null -w '%{http_code}\n' https://<主站域名>/recruitment/  # GET 空库首页应 200，不重定向；不用 -I（HEAD）
 systemctl status alethic-recruitment
 journalctl -u alethic-recruitment -n 50
 ```

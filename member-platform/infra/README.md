@@ -13,7 +13,7 @@ alethicinsight-cli --help
 alethicinsight-mcp --help
 ```
 
-服务根不含 `/api/v1`。本地成员服务启动见 [成员平台 README](../README.md)。不把历史考试 `/recruitment` URL 当成员服务默认值；公网成员入口尚未指定。
+服务根不含 `/api/v1`。先按 [成员平台 README](../README.md) 使用 `MEMBER_PLATFORM_*` 独立配置、保留首次生成的独立服务密钥，执行空库管理员 bootstrap，在 `http://localhost:8902/login` 登录并改密后再授权 CLI。重启恢复同一密钥，不重做 bootstrap；考试 `ALE_THIC_*`/`SECRET_KEY` 不能启动成员服务。不把历史考试 `/recruitment` URL 当成员服务默认值；公网成员入口尚未指定。
 
 ## 隔离凭据与登录
 

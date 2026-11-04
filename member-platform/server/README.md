@@ -23,16 +23,17 @@
 cd member-platform/server
 python -m venv .venv
 .venv/Scripts/python -m pip install -r requirements.txt
+# 仅首次初始化生成；受控保留此值，重启时恢复原值，不重新生成
 $env:MEMBER_PLATFORM_SECRET_KEY = (& .venv/Scripts/python -c "import secrets; print(secrets.token_urlsafe(48))")
 $env:MEMBER_PLATFORM_DATA_DIR = "$PWD/data"
 $env:MEMBER_PLATFORM_DB_PATH = "$PWD/data/members.db"
 .venv/Scripts/python scripts/bootstrap_member.py --student-id local-owner
-.venv/Scripts/python -m uvicorn app.main:app --host 127.0.0.1 --port 8091
+.venv/Scripts/python -m uvicorn app.main:app --host 127.0.0.1 --port 8902
 ```
 
 bootstrap 会交互读取两次临时管理员密码（不少于 12 字符，不通过命令行或文件传递）。只允许空库执行，不能用于覆盖或重置已有账号。**必须保留首次生成的独立服务密钥**供后续重启使用；更换密钥将导致已有密码验证失败，不应每次重启重新生成。示例不创建任何默认身份，也不会输出密码或密钥到服务日志。
 
-访问 `http://127.0.0.1:8091/login`：以显式配置的管理员账号和临时密码登录，修改初始密码后进入成员管理创建成员，或访问 `/org` 使用项目、知识、申请和 CLI 授权。管理员可在 `/login` 查看成员、修改角色或重置密码；随机临时密码仅在响应和当前页面短暂展示，页面 60 秒后隐藏，不写 localStorage/日志。请通过可信私密渠道交付本人。
+访问 `http://localhost:8902/login`：以显式配置的管理员账号和临时密码登录，修改初始密码后进入成员管理创建成员，或访问 `/org` 使用项目、知识、申请和 CLI 授权。管理员可在 `/login` 查看成员、修改角色或重置密码；随机临时密码仅在响应和当前页面短暂展示，页面 60 秒后隐藏，不写 localStorage/日志。请通过可信私密渠道交付本人。
 
 ## 配置
 

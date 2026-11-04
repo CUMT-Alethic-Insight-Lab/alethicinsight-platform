@@ -21,7 +21,7 @@ Agent：调用 `alethicinsight-cli projects list --recruiting --json`，展示�
 
 用户：“我选第一个，你帮我填表。”
 
-Agent：调用 `alethicinsight-cli forms schema project-join --json`，按 schema 从用户消息中提取字段；只询问尚缺信息。展示草稿和声明，经用户同意后以 `alethicinsight-cli applications draft --file application.json --json` 准备草稿，再由用户在返回的可信网页核对并最终提交。CLI/MCP 不执行最终提交。
+Agent：先确认用户已在会话外通过 `alethicinsight-cli auth login --scope profile:read:self --scope projects:read --scope applications:read:self --scope applications:create` 完成最小申请授权；默认只读 grant 连 schema 也不可读，不由 Agent 登录或扩权。随后调用 `alethicinsight-cli forms schema project-join --json`，按 schema 从用户消息中提取字段；只询问尚缺信息。展示草稿和声明，经用户同意后以 `alethicinsight-cli applications draft --file application.json --json` 准备草稿，再由用户在返回的可信网页核对并最终提交。CLI/MCP 不执行最终提交。
 
 ## 场景三：Bash 脚本中使用
 

@@ -27,6 +27,8 @@ alethicinsight-cli knowledge search '项目申请' --json
 alethicinsight-cli knowledge get DOCUMENT_ID --json
 alethicinsight-cli projects list --recruiting --json
 alethicinsight-cli projects get PROJECT_ID --json
+# schema 与草稿都需要 applications:create，默认只读 grant 不够；先完成重新授权
+alethicinsight-cli auth login --scope profile:read:self --scope projects:read --scope applications:read:self --scope applications:create
 alethicinsight-cli forms schema project-join --json
 alethicinsight-cli applications list --mine --json
 alethicinsight-cli applications get APPLICATION_ID --json
