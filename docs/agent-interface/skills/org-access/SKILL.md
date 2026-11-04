@@ -52,4 +52,4 @@ description: 按需查询 Alethic Insight 已授权组织知识、项目和本�
 
 未认证（3）或无权限（4）时停止相关调用，由用户处理授权；网络/API 错误（5）不得声称成功，校验失败（6）按 schema 修正，冲突或网页确认要求（7）先查询状态/交用户处理，不盲目重建草稿。退出码细节与 MCP 工具清单见 [CLI/MCP 契约](../../docs/05-cli-mcp-skills.md)。
 
-当前是一次性 code 交换的短时 CLI grant，**不是 OAuth/OIDC**；本 Skill 不声称 OAuth、真实浏览器或真实 Agent/MCP Host 已验证。协议自动测试不能代替真实客户端验收，也不代表生产部署完成。接口实现与单包边界见[包说明](../../../../infra/interface/alethicinsight-cli/README.md)。
+当前是一次性 code 交换的短时 CLI grant，**不是 OAuth/OIDC**；本 Skill 不声称 OAuth、真实浏览器或真实 Agent/MCP Host 已验证。协议自动测试不能代替真实客户端验收，也不代表生产部署完成。接口实现与单包边界见[成员 infra 说明](../../../../member-platform/infra/README.md)。CLI/MCP 只连接独立成员服务（本地显式根 `http://localhost:8902`），不复用考试库、账号或 `/recruitment` 入口。

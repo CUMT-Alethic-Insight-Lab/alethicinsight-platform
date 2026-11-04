@@ -38,14 +38,16 @@ python3 -m json.tool projects.json >/dev/null
 从仓库根安装同一个发行包，成员先在 Host 之外完成授权：
 
 ```sh
-python -m pip install ./infra/interface/alethicinsight-cli
+python -m pip install ./member-platform/infra/interface/alethicinsight-cli
+export ALETHICINSIGHT_API_BASE_URL=http://localhost:8902
+# 登录前按 MVP 手册设置仓库外全新的 ALETHICINSIGHT_CONFIG_DIR
 alethicinsight-cli auth login
 ```
 
 Host 的本地 stdio 启动配置示意：
 
 ```json
-{"command":"alethicinsight-mcp","args":["--cli","alethicinsight-cli"],"env":{"ALETHICINSIGHT_API_BASE_URL":"http://127.0.0.1:8901"}}
+{"command":"/absolute/path/to/member-venv/bin/alethicinsight-mcp","args":["--cli","/absolute/path/to/member-venv/bin/alethicinsight-cli"],"env":{"ALETHICINSIGHT_API_BASE_URL":"http://localhost:8902","ALETHICINSIGHT_CONFIG_DIR":"/absolute/path/to/new-private-directory-used-for-cli-login"}}
 ```
 
 两个入口来自同一包/版本；正式 Host 配置使用可信 venv 绝对路径（Windows 为 `Scripts/*.exe`），不填 token。stdio 上只能传协议消息，日志写 stderr。各 Host 配置格式与真实兼容性应分别实测。旧 `ALETHIC_API_BASE_URL`、`ALETHIC_BASE_URL`、`ALETHIC_CONFIG_DIR` 仅作兼容别名，新配置使用 `ALETHICINSIGHT_API_BASE_URL`、`ALETHICINSIGHT_CONFIG_DIR`。

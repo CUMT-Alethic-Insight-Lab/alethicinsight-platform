@@ -1,18 +1,21 @@
-# 05 · CLI / MCP / Skill：Agent 友好的适配层
+# 05 · CLI / MCP / Skill：成员产品适配层
 
 ## 产品与代码边界
 
-CLI 与 MCP 同属 infra 的公共接口，位于 `infra/interface/alethicinsight-cli/`，单仓、单发行包、单版本。发行名为 `alethicinsight-cli`，提供 `alethicinsight-cli` 与 `alethicinsight-mcp` 两个入口；不另设 MCP 仓，不保留两个顶层产品目录。MCP 是调用 CLI 的本地协议适配器，不承担业务授权或直接访问数据库。
+CLI 与本地 stdio MCP 归内部成员 infra：`member-platform/infra/interface/alethicinsight-cli/`。一个 `alethicinsight-cli` 发行包、同一版本、两个入口 `alethicinsight-cli` / `alethicinsight-mcp`，不另设 MCP 仓或发行包。MCP 调用同包 CLI，不承担业务授权或直接访问 DB。
 
-从仓库根安装一次即可获得两个入口（Python 3.10+）：
+以下是隔离代码集成后的安装入口；目标包尚未集成时停止，不改装根旧包，不以文档宣称隔离已验证。Python 3.10+，仓库根、成员专用虚拟环境：
 
 ```sh
-python -m pip install ./infra/interface/alethicinsight-cli
+python -m pip install ./member-platform/infra/interface/alethicinsight-cli
+export ALETHICINSIGHT_API_BASE_URL=http://localhost:8902
 alethicinsight-cli --help
 alethicinsight-mcp --help
 ```
 
-## 已实现命令与确认边界
+登录前按[运行手册](../../AGENT_INTERFACE_MVP.md#3-cli-安装与登录)设置仓库外全新私有 `ALETHICINSIGHT_CONFIG_DIR`。服务根不含 `/api/v1`，不是考试 `/recruitment`；不复用考试账号/会话或历史凭据目录。旧环境别名仅兼容，新配置用 `ALETHICINSIGHT_API_BASE_URL` 与 `ALETHICINSIGHT_CONFIG_DIR`。
+
+## 既有命令与确认边界
 
 ```sh
 alethicinsight-cli auth login
@@ -31,45 +34,38 @@ alethicinsight-cli applications submit --file ./application.json --dry-run --jso
 alethicinsight-cli applications draft --file ./application.json --json
 ```
 
-`submit --dry-run` 只进行服务端校验；`draft` 保存待确认草稿。无 dry-run 的 `applications submit` 也只创建草稿并以退出码 7 返回可信网页确认入口，不能完成正式提交。用户必须在可信网页重新核对内容并确认；CLI/MCP 不签发确认、不提交、不审批。不提供技能列表子命令，Skill 是随文档分发的说明。
+这些能力来自既有单包，不表示本次隔离后已复测。`submit --dry-run` 只校验；`draft` 保存未提交草稿；无 dry-run 的 submit 也只准备草稿并以退出码 7 返回可信网页入口。本人在成员网页重新核对并最终确认，CLI/MCP 不签发确认、不正式提交、不审批。Skill 随文档分发，没有技能列表子命令。
 
-## CLI 输出契约
+## 输出契约
 
-- `--json` 时 stdout 为一个 JSON 值（帮助输出除外）；日志与登录指引写 stderr，不输出密钥。
-- 退出码：0 成功；2 参数错误；3 未认证；4 无权限；5 API/网络不可用；6 校验失败；7 冲突或要求网页确认。
-- `--non-interactive` 或非 TTY 登录不打开浏览器、不等待输入；其他命令不自动登录。
-- 分页使用 `--limit 1..50`、`--cursor`，申请列表可用 `--project`；每次只读取一页。
-- 服务根通过 `ALETHICINSIGHT_API_BASE_URL` 设置，不含 `/api/v1`；专用凭据目录通过 `ALETHICINSIGHT_CONFIG_DIR` 设置。旧 `ALETHIC_API_BASE_URL`、`ALETHIC_BASE_URL`、`ALETHIC_CONFIG_DIR` 仅为兼容别名，新配置不要使用。
-- 不通过环境变量传 token；不把本地凭据文件、一次性 code 或网页 token 交给 Agent。
+- `--json` stdout 一个 JSON 值（帮助除外），诊断/登录指引 stderr，不输出密钥。
+- 退出码：0 成功，2 参数错误，3 未认证，4 无权限，5 API/网络/I/O，6 校验失败，7 冲突/需网页确认。
+- `--non-interactive` / 非 TTY 登录不打开浏览器、不等待输入；其他命令不自动登录。
+- `--limit 1..50`、`--cursor` 每次一页，申请可 `--project`；`--mine` 是用户体验参数，不是服务端所有权授权。
+- 不用环境变量传 token，不把凭据文件、code、网页 token 交给 Agent；本地文件受权限保护，不宣称 OS keychain。
 
 ## 本地 stdio MCP
 
-成员在 MCP 会话外完成 CLI 登录后，由 Host 启动同一发行包的入口：
+成员在 Host 之外完成 CLI 登录。Host 配置结构视产品而定，示例路径须换成可信成员 venv 与刚创建的同一凭据目录绝对路径，JSON 不展开 shell 变量：
 
 ```json
-{"command":"alethicinsight-mcp","args":["--cli","alethicinsight-cli","--timeout","15"],"env":{"ALETHICINSIGHT_API_BASE_URL":"http://127.0.0.1:8901"}}
+{"command":"/absolute/path/to/member-venv/bin/alethicinsight-mcp","args":["--cli","/absolute/path/to/member-venv/bin/alethicinsight-cli","--timeout","15"],"env":{"ALETHICINSIGHT_API_BASE_URL":"http://localhost:8902","ALETHICINSIGHT_CONFIG_DIR":"/absolute/path/to/new-private-member-config"}}
 ```
 
-生产配置应指定可信本地可执行文件的绝对路径，Windows 使用 venv 的 `Scripts/alethicinsight-mcp.exe` 和 `Scripts/alethicinsight-cli.exe`。`--cli` 不是 shell 字符串；工具参数不能覆盖它或服务地址。
+Windows 使用成员 venv `Scripts/*.exe`。`--cli` 不接受 shell 字符串/非可信程序，工具参数不能覆盖它或服务地址，stdio stdout 专供逐行 JSON-RPC。不是远程 HTTP MCP。
 
-| MCP Tool | 后端映射 | 风险 |
-|---|---|---|
+| Tool | 成员后端映射（相对 `/api/v1`） | 风险 |
+| --- | --- | --- |
 | `org_capabilities` | GET `/capabilities` | 低 |
-| `org_search_knowledge` | GET `/knowledge/search` | 低，内容仍受 ACL |
+| `org_search_knowledge` | GET `/knowledge/search` | 内容仍按 ACL |
 | `org_list_projects` | GET `/projects` | 低 |
 | `org_get_project` | GET `/projects/{id}` | 低 |
-| `org_get_form_schema` | GET `/forms/{kind}/schema` | 低 |
-| `org_list_my_applications` | GET `/applications?mine=true` | 中，个人信息 |
-| `org_prepare_application` | POST `/applications/drafts` | 中，仅草稿 |
+| `org_get_form_schema` | GET `/forms/project-join/schema` | 仅当前表单 |
+| `org_list_my_applications` | GET `/applications` | 服务端限定本人 |
+| `org_prepare_application` | POST `/applications/drafts` | 仅草稿 |
 
-API 表中路径相对 `/api/v1`；`/auth/cli/*` 授权路由不因发行名变化而改名。不提供最终提交、确认签发、review、SQL、shell、任意 URL 抓取或全员列表工具。stdout 仅承载逐行 JSON-RPC，日志不混入协议。
-
-实现协商范围为 `2024-11-05`、`2025-03-26`、`2025-06-18`，不代表所有客户端完整规范兼容。只提供本地 stdio，不提供远程 MCP、资源、prompts 或订阅。真实 Host 名称、版本、握手与工具调用结果需要另行实测，不以协议自动测试代替。
+API 名不改，授权仍 `/auth/cli/*`。不提供确认、正式提交、review、SQL、shell、任意 URL 或全员导出。既有协议协商范围为 `2024-11-05`、`2025-03-26`、`2025-06-18`；不是所有 Host 兼容声明，不提供远程 MCP、resources、prompts 或订阅。隔离后须实际安装/握手/调用，真实 Host 名称、版本和负例另记，不以协议自动测试代替。
 
 ## Skill 三层发现
 
-- **L1**：薄入口说明，通过 `alethicinsight-cli capabilities --json` 发现实时能力。
-- **L2**：按需读取 [组织访问 Skill](../skills/org-access/SKILL.md)，说明工作流、权限与输入输出。
-- **L3**：按用户权限检索项目、表单与带来源/版本的文档；不把实时数据写死在 Skill。
-
-Skill 不是授权规则。成员自行选择模型并承担个人模型费用；没有 Agent 也可通过 CLI 查询和准备草稿，再由网页最终提交。可选官网模型并非本次交付。详见[仓库边界](../../REPOSITORY_BOUNDARIES.md)。
+L1 用 capabilities 发现实时能力；L2 按需读 [组织访问 Skill](../skills/org-access/SKILL.md)；L3 按权限取项目、schema、制度来源与 revision，不写死实时资料。Skill 不是授权。成员自行选择模型并承担费用，没有 Agent 也可 CLI 查询/准备草稿和网页提交。可选官网模型非本次交付。详见[产品边界](../../REPOSITORY_BOUNDARIES.md)。

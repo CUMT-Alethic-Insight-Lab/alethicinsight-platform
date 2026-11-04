@@ -1,62 +1,52 @@
-# 组织接口 MVP：本地运行与人工运维手册
+# 内部成员平台 MVP：本地运行与人工运维手册
 
-> 本次交付是现有招新平台的增量代码/契约，不表示生产已部署。所有生产发布、知识导入、权限变更、备份和恢复须由有权限的人另行执行；本次文档工作未连接生产、读取密钥或操作真实成员数据。测试结果由主代理按实际执行补充，不预填数字。
+本手册服务于独立的内部成员产品，不再把它作为招新平台增量。第一阶段同仓布局为 `member-platform/server/` 与 `member-platform/infra/interface/alethicinsight-cli/`；根 `server/` 仅考试。共同基线 `229e69c` 尚为共享 DB/账号/启动的混合实现，隔离代码须经集成测试和 PR 审查，本次文档不冒称已解耦。旧设计与测试原记录见 [migration.md](migration.md)。
 
-- [API 与工作流](agent-interface/docs/04-api-and-workflows.md)
-- [OpenAPI 契约](agent-interface/contracts/openapi-skeleton.yaml)
-- [验收与事实边界](agent-interface/docs/09-roadmap-and-acceptance.md)
-- [决策/未决运维事项](agent-interface/docs/10-decision-register.md)
-- [集成交接](agent-interface/docs/11-agent-handoff.md)
-- [旧部署说明](../server/deploy/README.md)（历史操作说明，不是本次部署授权）
+- [产品安装入口](../member-platform/README.md)、[infra 安装入口](../member-platform/infra/README.md)
+- [API 与工作流](agent-interface/docs/04-api-and-workflows.md)、[OpenAPI](agent-interface/contracts/openapi-skeleton.yaml)
+- [验收](agent-interface/docs/09-roadmap-and-acceptance.md)、[决策](agent-interface/docs/10-decision-register.md)、[集成交接](agent-interface/docs/11-agent-handoff.md)
 
-## 1. 范围与路径
+## 1. 服务、数据与权限边界
 
-应用内部新路由为 `/api/v1`，本地根地址 `http://127.0.0.1:8901`；公网预期根地址 `https://<host>/recruitment`，反代 strip 后到相同内部路由。`PUBLIC_PREFIX=/recruitment` 用于网页链接，不给 APIRouter 再加此前缀。CLI base 是服务根，**不含 `/api/v1`**。
+成员服务根示例为 **`http://localhost:8902`**，内部 REST `/api/v1`，网页 `/org`；CLI base 是服务根，不含 `/api/v1`。不预设成员生产域名、`/recruitment` 前缀或考试 edge/authoritative 反代链路，不把根考试部署脚本用作成员部署。
 
-保留旧 `/api/auth/*`、`/api/campaigns/*`、招新报名/机试/评审和 exam-kit API 合约，不将其数据暴露到组织知识接口。考生端源码现归独立公共 [recruitment-exam-kit](https://github.com/CUMT-Alethic-Insight-Lab/recruitment-exam-kit)；下文 PR #3 的 `cd exam_kit` 测试记录为分仓前历史结果，不是当前平台内的测试入口。组织事务与旧招新 application 分开。网页沿用 Bearer session；CLI 是一次性 code 交换的独立短时 grant，不是 OAuth/OIDC。只有当前 member/admin 可用组织接口；网页管理还要当前 admin，CLI 不授予 review。
+成员服务拥有独立 DB、账号、网页 Bearer session 与 CLI grant；不能使用考试 DB、账号凭据或会话。相同 API 登录路径或配置键拼写不代表身份共用。只有本成员库当前 member/admin 可用组织接口；网页管理还需当前 admin，CLI scope 不授予 review。考试管理员不是成员平台管理员。
 
-本次不交付 Gitea、远程 MCP、官网内置模型或真实 Agent 兼容性认证。其他方案文件里的设备借用、`--confirm` 和通用表单示例不是本次可执行命令。
+API 名保持不变；`Application` 仍是项目加入等组织事务，不是招新 application。根考试保留 `/api/auth/*`、`/api/campaigns/*` 和旧 exam-kit 协议，但不对成员库提供桥接。CLI 一次性 code 交换是短时授权，不是 OAuth/OIDC。本次不交付 Gitea、远程 MCP、官网内置模型或真实 Agent 兼容认证。
 
 ## 2. 隔离本地运行
 
-下面从仓库根在 Git Bash/Linux shell 运行。只使用新建的开发数据目录，不指向 `server/data`、生产镜像或备份；环境变量必须在导入 `app.config` 前设置。
+从仓库根在新的 Git Bash/Linux 终端执行，要求成员代码已集成；目标文件缺失时停止，不退回根 `server` 启动组织接口。配置变量须在导入 `app.config` 前设置。
 
 ```sh
-python -m venv .venv
-# Git Bash / Windows
-source .venv/Scripts/activate
-# Linux 改用 source .venv/bin/activate
-python -m pip install -r server/requirements.txt
-export ALE_THIC_DATA_DIR="$PWD/.local-agent-mvp"
-export ALE_THIC_DB_PATH="$ALE_THIC_DATA_DIR/alethic_insight.db"
+python -m venv .venv-member
+# Windows Git Bash；Linux 使用 source .venv-member/bin/activate
+source .venv-member/Scripts/activate
+python -m pip install -r member-platform/server/requirements.txt
+export ALE_THIC_DATA_DIR="$PWD/.local-member"
+export ALE_THIC_DB_PATH="$ALE_THIC_DATA_DIR/member.db"
 export ALE_THIC_ROLE=authoritative
 export PUBLIC_PREFIX=''
-export ALE_THIC_CAPTCHA_ENABLED=0
 export SECRET_KEY="$(python -c 'import secrets; print(secrets.token_urlsafe(32))')"
-python -m uvicorn app.main:app --app-dir server --host 127.0.0.1 --port 8901
+python -m uvicorn app.main:app --app-dir member-platform/server --host 127.0.0.1 --port 8902
 ```
 
-目录由配置初始化。`SECRET_KEY` 示例是当前 shell 的临时开发值，不落盘、不打印；不要采用开发默认值上线。本地初始化可能播种管理员，初始密码必须先改；测试成员请使用本地管理流程建立，不复制真实成员。不要提交 `.local-agent-mvp`、本地凭据或日志；提交前检查 `git status`。
+沿用配置键名不等于继承考试配置。只允许新建开发目录，不指向 `server/data`、考试 `.local-exam`、生产镜像或备份。临时密钥不落盘、不打印、不上线；初始化管理员与密码变更遵循成员应用提示，仅创建合成账号，不复制真实成员。提交前检查状态，禁止提交 DB/WAL、凭据、日志。
 
-在另一个终端检查 `http://127.0.0.1:8901/api/health` 和 `/openapi.json`。组织网页为 `/org`，先完成已有网页登录与密码变更。
+另一个终端访问 `http://localhost:8902/org` 与 `http://localhost:8902/openapi.json`。隔离应用负责注册 org router、最小成员网页登录与成员表初始化，不加载考试报名、交卷、staging、归档或批次回收。`/org` 禁止 iframe 嵌套，组织错误保持 envelope/request_id。成员服务即使保留 `ALE_THIC_ROLE` 兼容配置，也不能借此挂载考试 edge 功能；生产拓扑另审。
 
-### 注册与初始化位置
-
-`server/app/main.py` 已注册 `org_auth`、`org_meta`、`org_content`、`org_requests` 和 `/org`，新路由均在 `/api/v1`。`db.init_db()` 负责幂等增量建表，不重建旧数据。`/org` 响应禁止 iframe 嵌套，组织错误使用统一 envelope 和 request_id，旧 `/api` 保持原结构。
-
-authoritative/edge 必须保持单一权威：旧 edge 机试暂存转发只适用于旧机试；组织授权、principal、草稿、确认、提交、review 和知识同步均不得在 edge 独立落库。云端 vhost 将 `/recruitment/api/v1/` 全部回源 lab 且不配置热备回落，edge 应用层同时拒写。
+同时运行考试服务的命令见[根 README](../README.md)。双服务的 DB 路径、虚拟环境、数据目录和配置值必须不同；不能以两个端口共用同一库假装独立。
 
 ## 3. CLI 安装与登录
 
-需要 Python 3.10+；从仓库根，在本地 venv 安装 infra 公共接口单包。发行名 `alethicinsight-cli`，CLI 与 MCP 单仓、单版本，同一次安装提供两个入口：
+Python 3.10+，在成员虚拟环境从仓库根安装同一发行包，提供两个正式入口：
 
 ```sh
-python -m pip install ./infra/interface/alethicinsight-cli
-# 系统临时目录必须位于仓库外；每次演练新建，不复用任何已有凭据目录。
-export ALETHICINSIGHT_CONFIG_DIR="$(python -c 'from pathlib import Path; import tempfile; root = Path.cwd().resolve(); base = Path(tempfile.gettempdir()).resolve(); assert base != root and root not in base.parents, "系统临时目录必须位于仓库外"; print(tempfile.mkdtemp(prefix="alethicinsight-mvp-", dir=base))')"
-# 创建失败则停止，避免回退到默认/历史凭据目录；不要读取或复制凭据文件。
+python -m pip install ./member-platform/infra/interface/alethicinsight-cli
+# 每次演练新建仓库外隔离目录，不读取或复制任何历史凭据
+export ALETHICINSIGHT_CONFIG_DIR="$(python -c 'from pathlib import Path; import tempfile; root = Path.cwd().resolve(); base = Path(tempfile.gettempdir()).resolve(); assert base != root and root not in base.parents; print(tempfile.mkdtemp(prefix="alethicinsight-member-", dir=base))')"
 test -n "$ALETHICINSIGHT_CONFIG_DIR" || exit 1
-export ALETHICINSIGHT_API_BASE_URL=http://127.0.0.1:8901
+export ALETHICINSIGHT_API_BASE_URL=http://localhost:8902
 alethicinsight-cli --help
 alethicinsight-cli auth login
 alethicinsight-cli auth status --json
@@ -66,15 +56,15 @@ alethicinsight-cli forms schema project-join --json
 alethicinsight-cli applications list --mine --limit 20 --json
 ```
 
-新配置使用 `ALETHICINSIGHT_API_BASE_URL` 与 `ALETHICINSIGHT_CONFIG_DIR`；旧 `ALETHIC_API_BASE_URL`、`ALETHIC_BASE_URL`、`ALETHIC_CONFIG_DIR` 仅为兼容别名，不再作为推荐配置。服务端第 2 节的 `ALE_THIC_*` 配置不在客户端重命名范围内。API `/auth/cli/*` 路由保持不变。
+新配置使用 `ALETHICINSIGHT_API_BASE_URL` 与 `ALETHICINSIGHT_CONFIG_DIR`；旧 `ALETHIC_API_BASE_URL`、`ALETHIC_BASE_URL`、`ALETHIC_CONFIG_DIR` 仅兼容。显式服务根不能省略，不依赖旧考试 URL 默认值。`/api/v1/auth/cli/*` 路由不因移动包目录更名。
 
-参见 [CLI/MCP 说明](agent-interface/docs/05-cli-mcp-skills.md)与[仓库边界](REPOSITORY_BOUNDARIES.md)。CLI 生成随机 request_id，打开可信 `/org?cli_request=...`，用户在网页核对 scopes 后取一次性 code，并在 CLI 隐藏输入提示中输入。不得向 Agent 粘贴网页 token、密码、code、CLI token 或确认 token。默认 scopes 只读；要准备草稿需重新明确授权 `applications:create`，例如：
+CLI 随机 request_id，引导可信成员 `/org?cli_request=...`。用户核对 scopes 后取一次性 code，在 CLI 隐藏提示输入；密码、网页 token、code、CLI token 和确认 token 不进 Agent 上下文。默认只读，草稿需明确授权：
 
 ```sh
 alethicinsight-cli auth login --scope profile:read:self --scope applications:create --scope applications:read:self --scope projects:read
 ```
 
-先读表单，再准备本地脱敏 JSON（project_id 与 revision 以实际接口为准）：
+先读 schema，再准备本地脱敏 `application.json`，project_id/revision 以实际返回为准：
 
 ```json
 {"kind":"project-join","form_revision":"1","fields":{"project_id":"LOCAL_TEST_PROJECT_ID","motivation":"希望参与本地测试项目并验证加入流程","weekly_hours":4,"notes":"仅本地演练"}}
@@ -85,28 +75,22 @@ alethicinsight-cli applications submit --file application.json --dry-run --json
 alethicinsight-cli applications draft --file application.json --json
 ```
 
-`--dry-run` 只服务端 validate；draft 持久化但不提交。CLI 的 `applications submit` 也只准备草稿并返回需要可信网页确认（退出码 7），没有 `--confirm`、最终提交或 review。用户必须在 `/org?draft_id=...` 重新核对并确认，网页才取得短时 token 并提交。REST 最终提交 body 是 `draft_id + confirmation` 字符串，不是 `fields` 或旧版嵌套 `confirmation_token`。
+`--dry-run` 只 validate；draft 持久化未提交草稿。CLI `applications submit` 也只准备草稿并返回需网页确认（退出码 7），没有 `--confirm`、最终提交或 review。用户必须在可信 `/org?draft_id=...` 重新核对，网页取得一次性 confirmation 后提交 `draft_id + confirmation`，不是再传 fields 或旧嵌套 confirmation_token。
 
-分页只取一页，下一页传 `--cursor`，CLI 页大小目前为 1..50。JSON 输出与日志分离；错误退出码见 CLI 说明。`auth logout` 尝试通过 `DELETE /auth/cli/grants/self` 撤销当前 grant，并清理本地凭据；以 `server_revoked` 判断是否确认完成服务端撤销，未确认时到可信网页撤销或等待过期。本地凭据存储及兼容迁移以单包说明为准；隔离演练使用 `ALETHICINSIGHT_CONFIG_DIR` 指向新建的私有临时目录，不读取或复制已有凭据文件，不放入代码库、共享目录或备份。
+分页只取一页，后续用 `--cursor`，页大小 1..50。`auth logout` 尝试 `DELETE /auth/cli/grants/self` 自撤销并清除本地凭据，只有确认响应才可认定服务端撤销；网络失败时到可信网页撤销或等过期。不能将凭据目录放仓库、共享目录或备份中。
 
 ## 4. 本地 stdio MCP 入口
 
-第 3 节单包安装已经提供 MCP，不需要再安装第二个发行包。在同一用户完成 CLI 授权后检查：
-
-```sh
-alethicinsight-mcp --help
-```
-
-MCP Host 的本地 stdio 配置示例（实际配置文件结构取决于 Host；可执行文件路径需换为本地 venv 的绝对路径）。将 `ALETHICINSIGHT_CONFIG_DIR` 占位值替换为**第 3 节首次登录前新建的同一隔离目录的绝对路径**，不得使用默认、历史或其他已有凭据目录；不要为 Host 另建目录，否则无法使用刚才的本地授权。JSON 不会展开 `$ALETHICINSIGHT_CONFIG_DIR`，应由操作者在本地填写路径，不读取凭据内容：
+同包安装后已有 MCP，不安装第二发行包。Host 使用刚才授权的同一成员服务根与隔离目录；以下路径需由操作者本地填写，JSON 不展开 shell 变量：
 
 ```json
 {
   "mcpServers": {
     "alethicinsight": {
-      "command": "/absolute/path/to/venv/bin/alethicinsight-mcp",
-      "args": ["--cli", "/absolute/path/to/venv/bin/alethicinsight-cli"],
+      "command": "/absolute/path/to/member-venv/bin/alethicinsight-mcp",
+      "args": ["--cli", "/absolute/path/to/member-venv/bin/alethicinsight-cli"],
       "env": {
-        "ALETHICINSIGHT_API_BASE_URL": "http://127.0.0.1:8901",
+        "ALETHICINSIGHT_API_BASE_URL": "http://localhost:8902",
         "ALETHICINSIGHT_CONFIG_DIR": "/absolute/path/to/the-new-isolated-directory-from-section-3"
       }
     }
@@ -114,79 +98,57 @@ MCP Host 的本地 stdio 配置示例（实际配置文件结构取决于 Host�
 }
 ```
 
-Windows 对应 `Scripts/alethicinsight-mcp.exe` 和 `Scripts/alethicinsight-cli.exe`；目录路径可写为 `C:/Users/.../AppData/Local/Temp/alethicinsight-mvp-...`，须使用实际生成值。这里不在环境参数写 token；适配器通过同一用户、同一隔离目录的 CLI 凭据调用 API。不要将非可信程序或 shell 字符串作为 `--cli`。不要把它启动为远程 HTTP 服务；stdio 的 stdout 专供 JSON-RPC，不手工混入日志。工具只允许发现/读取和准备待网页确认草稿，不包含确认签发、最终提交、review、SQL、shell 或任意 URL 抓取。
+Windows 使用 `Scripts/alethicinsight-mcp.exe` / `Scripts/alethicinsight-cli.exe`。不要在 env 写 token，不复用默认或历史凭据目录，不把 shell 字符串/非可信程序交给 `--cli`。本地 stdio stdout 专供协议，不启动远程 HTTP MCP。工具只允许发现、读取与准备草稿，不包括确认签发、最终提交、review、SQL、shell 或任意 URL 抓取。
 
-本地协议自动测试不等于实际 MCP Host 接入成功，也不代表 MCP 所有版本均兼容。支持版本和参数以 `infra/interface/alethicinsight-cli/` 内的实现、`--help` 及实际握手为准；真实客户端名称/版本/结果需另行记录。
+协议自动测试不等于真实 Host 接入。支持版本以集成后包实现、`--help` 和真实握手为准；具体 Host/版本与结果分别记录。参见 [CLI/MCP](agent-interface/docs/05-cli-mcp-skills.md)。
 
 ## 5. 受控知识同步
 
-同步只读取人工准备好的本地公开来源 checkout，不在 HTTP 请求内联网爬取，不读取私有仓和生产文件。脚本 [sync_org_knowledge.py](../server/scripts/sync_org_knowledge.py) 目前只允许 `governance-public`，默认列举成员制度、章程、AI 辅助政策；这些路径必须在选定 revision 真实存在并经人工确认许可。建议使用已审核的完整 commit hash 固定来源。
+同步仅处理人工审核的本地公开 checkout，不在 HTTP 请求内爬取，不读取私有仓或生产资料。脚本归成员 `member-platform/server/scripts/sync_org_knowledge.py`；若隔离集成未完成，不运行根旧脚本来绕过。沿用原同步的 `governance-public` allowlist、UTF-8 `.md/.txt`、路径/数量/体积限制，拒绝 restricted、隐藏文件和路径逃逸。
 
-在服务已对隔离数据库完成初始化后、保持第 2 节相同数据环境，执行：
+保持第 2 节同一成员 DB 环境，在空开发库完成初始化后：
 
 ```sh
-python server/scripts/sync_org_knowledge.py --help
-python server/scripts/sync_org_knowledge.py --local-dir /path/to/reviewed/governance-public --revision FULL_40_HEX_COMMIT
-# 如需覆盖默认名单，人工审查后增加 --allowlist /path/to/approved-manifest.json
+python member-platform/server/scripts/sync_org_knowledge.py --help
+python member-platform/server/scripts/sync_org_knowledge.py --local-dir /path/to/reviewed/governance-public --revision FULL_40_HEX_COMMIT
+# 覆盖名单须另行人工审查，再加 --allowlist /path/to/approved-manifest.json
 ```
-
-清单形状：
 
 ```json
 {"source_repo":"governance-public","documents":[{"path":"docs/zh-CN/membership.md","title":"成员制度","access_level":"public"}]}
 ```
 
-仅 `public/member`、UTF-8 `.md/.txt`，受数量、体积和路径边界检查；restricted/隐藏文件/路径逃逸拒绝。同步按来源清单 upsert，并删除同来源不再在清单内的记录；**空清单会清空该来源索引**。每次先备份本地目标 DB、审阅清单，失败不应部分写入。revision 缺省时使用内容 SHA-256，链接可能仍指 main；脚本只校验完整 Git revision 的格式，**不会自行验证 checkout 的 remote、commit 或工作树一致性**，操作者必须核对来源。同步仅限 authoritative，edge 会拒绝写入。该同步不等于 GitHub/Gitea 镜像或私有代码索引。完成后用 member/CLI 搜索和文档详情验证来源、版本、可见性；撤除/收窄文档后旧搜索摘要也不得继续可见。
+来源路径、许可、完整 commit 和 checkout 状态由操作者核实；脚本 revision 格式校验不证明 remote/commit 一致。同步按来源清单 upsert 并删除未列出的旧索引，**空清单会清空该来源**；先备份明确的本地成员库，审阅清单，失败不可部分写入。完成后用成员 CLI 验证来源、版本、可见性；撤除文档不能留下旧摘要。这不是全仓镜像或真实知识导入已完成的声明。
 
 ## 6. 测试与验收记录
 
-标准后端命令从 `server/` 运行 `python -m pytest -q`；新增模块测试使用 `test_m31` 以后的独立文件。先运行针对性测试，再由主代理执行全量。文档模块使用 YAML 解析、内部 `$ref`、operationId/路径参数和本地 Markdown 链接检查；正式发布前再与应用生成的 `/openapi.json` 比较。
+从仓库根分别在对应环境执行：
 
-历史记录（2026-10-27，保留原结果，不代表本次单包重构的验证；当前全量结果由主代理最终更新）：
-
-| 证据 | 状态/命令/结果 |
-|---|---|
-| 文档 YAML 与本地链接 | 通过；OpenAPI 21 个 operation 与运行时路由对照一致，ID 唯一，错误 envelope 一致 |
-| 新模块自动测试与全量回归 | `cd server && python -m pytest -q`：**451 passed** |
-| 无模型本地 HTTP/CLI/MCP 闭环 | `test_m37_org_live_e2e.py` 通过：真实 uvicorn + 实际 CLI/MCP 源码子进程，合成账号/项目；真实浏览器未验证 |
-| CLI/MCP 安装包 | Windows 上两个 wheel 均实际构建成功；Linux、跨平台及全新环境安装待验证 |
-| 两种真实 Agent（MCP 与命令行） | 未以协议测试代替，待验证 |
-| 目标硬件与容量 | 待测量 |
-| 离机备份/隔离恢复 | 待演练 |
-| 生产发布/反代/TLS | 配置已入 PR，未执行生产部署、nginx reload 或线上验证 |
-
-最终串行复核（2026-11-02）：文档共 20 个文件、44 个本地链接目标均存在，旧命令、错误发行拼写与未实现命令示例检查通过；`git diff --check`、前端 JS 语法检查通过。`cd server && python -m pytest -q` 为 **566 passed**，`cd exam_kit && python -m pytest -q` 为 **311 passed**。运行时与人工 OpenAPI 的 **22 个 operation** 对齐，当前 grant 自撤销具有 Bearer security 与响应模型。单发行 wheel 在干净临时环境安装后，两个正式入口均实际运行；默认 MCP 使用隔离模式，伪造同名模块未执行。Windows 最终 ACL 读取验证通过，POSIX 权限分支仅有 mock 覆盖。真实浏览器、真实 Agent Host、独立 POSIX 主机、目标硬件、备份恢复和生产发布仍未验证，未执行 nginx reload 或部署。
-
-## 7. 备份与隔离恢复（人工操作方案）
-
-备份对象不只有代码：SQLite（含旧账号/会话和新 principal/grant、授权码、草稿/确认、事务、幂等、review、审计、项目与文档）、数据目录内的必要上传/清洗件，以及脱离代码库受保护的运行配置。知识来源清单和固定 revision 也要可追溯。原有 exam archive 不是全库备份。
-
-- 有写入时不能只复制 `.db` 而遗漏 WAL。使用 SQLite backup API/`.backup` 得到一致数据库；如需要与上传目录形成跨文件一致快照，先人工停写/停止服务，再一并备份。
-- 下面只操作明确指定的**本地演练**库；路径替换为隔离环境，备份文件不得提交仓库。先创建新的备份目录，再运行 Python：
-
-```python
-from pathlib import Path
-import sqlite3
-source = Path(".local-agent-mvp/alethic_insight.db").resolve()
-backup = Path("/path/to/new-local-backup/alethic_insight.db").resolve()
-assert source.is_file() and not backup.exists()
-with sqlite3.connect(source.as_uri() + "?mode=ro", uri=True) as src:
-    with sqlite3.connect(backup) as dst:
-        src.backup(dst)
-        assert dst.execute("PRAGMA integrity_check").fetchone()[0] == "ok"
+```sh
+(cd server && python -m pytest tests -q)
+(cd member-platform/server && python -m pytest tests -q)
+python -m pip wheel --no-deps ./member-platform/infra/interface/alethicinsight-cli --wheel-dir /path/to/new-temporary-wheel-dir
 ```
 
-- 备份含敏感凭据哈希与个人事务，必须加密、限制访问、离机保存并设置保留期；不上传公开仓，不复制 CLI 明文凭据。负责人记录时间、代码/schema 版本、校验摘要、RPO/RTO。
-- 恢复演练先停本地测试实例，将备份恢复到**新目录**而非覆盖原库；使用 `ALE_THIC_DATA_DIR/ALE_THIC_DB_PATH` 指向恢复副本，隔离网络后 `PRAGMA integrity_check`，核验表/行数、旧接口和新申请闭环。
-- 恢复旧快照可能复活已撤销 grant/会话/一次性 code/确认。恢复后先按已审核的管理步骤无效化这些凭据、要求重新登录/授权；未完成前不开放网络。不能只凭过期时间认为恢复安全。
-- 不提供对生产库直接运行的覆盖/DELETE 命令。演练成功才可制定实际恢复窗口、上传目录配套恢复和人员值守方案。
+本页先给命令，不编造通过数；当前文档工作未运行应用测试。集成交接须记录 commit、系统/依赖、实际命令、退出状态、失败和跳过。验证还包括：
+
+- 考试进程不挂载 `/org` 或组织 `/api/v1`；成员进程不挂载考试业务或运行考试维护任务。
+- 双空库、合成账号同时启动，账号与 session/grant 不跨产品生效，管理员权限不继承；任何一套初始化/维护不改变另一套 DB。
+- 成员真实 HTTP + 实际 CLI/MCP 子进程闭环、撤权/草稿确认/幂等与权限负例；干净 wheel 安装和两个入口。
+- YAML 解析、内部 `$ref`、operationId/路径参数、本地 Markdown 链接检查，成员 `/openapi.json` 与人工契约对照。
+
+原 451/566/311 等历史数字移至 [migration.md](migration.md)，不当作隔离后的验收。真实浏览器、两种真实 Agent Host、独立 POSIX 主机、目标硬件、离机备份/恢复、TLS/反代和生产发布各自待验，不能用协议测试代替。
+
+## 7. 备份与隔离恢复（未执行的人工方案）
+
+成员备份集合仅含本产品 DB、必要文件、知识来源清单/revision 与受保护配置；考试 DB、考生清洗件/附件/归档另按考试策略备份，不把混合旧库直接复制为成员库。SQLite 使用 backup API/`.backup` 得到一致副本，活跃写入时不得遗漏 WAL；跨文件一致性需要经批准停写窗口。
+
+备份加密、限制访问、离机保留，记录代码/schema、摘要、时间、RPO/RTO 与责任人，不提交 Git、不备份 CLI 明文凭据。恢复到新隔离目录，不覆盖原件，核验 integrity_check、成员权限和事务闭环；不得连到考试库。恢复快照可能复活会话、grant、code 与 confirmation，重新开放前必须按审查过的流程使旧凭据失效并要求重新登录。
+
+真实混合库中的成员身份如何迁出、哪些历史记录可迁、密码与授权如何失效，均须另立数据迁移方案，当前未执行。不提供生产覆盖/DELETE 命令。
 
 ## 8. 发布前与回滚（未执行）
 
-生产部署仍需人工执行。沿用现有 release/current 与 systemd/nginx 流程，但不要直接重跑旧部署说明中的历史身份初始化片段；当前 Bearer session 与环境配置以实际代码和经审查配置为准，不读取或展示私有凭据。
+先审查同仓隔离 PR 与合成数据验收，再设计成员独立部署、私有网络/域名、TLS、反代、配置/秘密管理、审计与备份。不重跑旧考试部署脚本，不把考试 edge 当成员写入权威，也不以本次文档授权 nginx reload。
 
-发布前：评审 PR/测试结果 → 备份并记录旧 release → 确认 schema 增量和旧版兼容 → 确认新 API 权威路由及 edge 拒写/回源行为 → 审查 TLS、前缀、页面缓存、授权 TTL/撤销/日志/限流 → 指定维护窗口 → 人工发布 → 使用脱敏账号 smoke test。生产命令由负责人在受控运维渠道执行，本手册不授权自动 deploy。
-
-回滚：先停新写入与授权，记录故障和最后一致点；人工把 `current` 指回已记录的旧 release 并重启，核验旧招新/机试/登录。增量表如旧代码忽略即可保留，**不要为回滚代码直接 DROP 新表**。旧版本不能提供新 API，应同时关闭新网页/CLI 入口并明确告知用户；缓存旧 JS 不能继续诱导提交。
-
-若存在不兼容迁移或库损坏，不能仅切代码。先备份故障态，在维护窗口经批准恢复一致数据库和配套文件，明确恢复点之后的新事务丢失/补录策略；恢复副本先隔离验证并撤销快照凭据，再重新开放。回滚不保证自动保留所有新写入，必须把这一风险和恢复责任人写入发布记录。
+源码回退走新的 revert PR；不 reset/clean 或覆盖原脏工作区。运行回退需记录旧成员 release、schema 兼容与一致快照，先停新写入和授权；不能为了代码回退 DROP 表或覆盖考试 DB。不兼容迁移需另审维护窗口、故障态备份、数据损失/补录策略与恢复后凭据撤销。真实数据迁移与生产发布都是独立审批事项，本次未执行。
