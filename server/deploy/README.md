@@ -105,7 +105,7 @@ LAB_HOST=<user@host> SSH_KEY=<私钥路径> \
 
 发布前记录平台 commit/tag、套件 commit/tag、安装包版本/SHA256，分别运行两仓测试，
 并在隔离环境验证登录、交卷、报告及使用到的 LAN/P2P 通路。公共 CLI 接口仍归平台
-[infra/interface/alethicinsight-cli](https://github.com/CUMT-Alethic-Insight-Lab/recruitment-exam-platform/tree/main/infra/interface/alethicinsight-cli)
+[infra/interface/alethicinsight-cli](https://github.com/CUMT-Alethic-Insight-Lab/alethicinsight-platform/tree/main/infra/interface/alethicinsight-cli)
 维护，不随接收机一起打包，也不另拆 MCP。
 
 回滚应用时恢复旧 `current`；接收机当前是原地覆盖而非 release 软链，必须从之前记录的
