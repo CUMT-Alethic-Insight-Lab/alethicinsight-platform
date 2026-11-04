@@ -2,27 +2,27 @@
 
 ## 已知条件
 
-设计输入为 Ubuntu 24.04、Intel N5095、4 GB 内存、512 GB M.2 SSD；本次未实测硬件。代码与部署文档已确认现有系统是静态官网、云端 edge、lab authoritative 的混合链路，不是所有服务都位于这台小主机。下列内容是 lab 侧目标拓扑，不意味着这些服务已安装；云端写暂存、权威切换和静态入口须另行设计。内置 DeepSeek 模型调用远端 API，本机不做 LLM 推理。
+历史设计输入为 Ubuntu 24.04、Intel N5095、4GB 内存与 512GB SSD，本次未实测。旧考试部署是静态官网、云端 edge、lab authoritative 混合链路，**不是成员产品已部署的拓扑**；不继承考试 `/recruitment`、回源/暂存、账号或 DB。
 
-## 推荐拓扑
+内部成员与招新筛选是独立产品。先同仓 `member-platform/` 独立运行与 PR 审查；下文仅是后续成员运维方案，不是生产执行记录。Gitea/连接器/官网模型未交付，域名/反代、RPO/RTO、服务账号和真实数据迁移另审。
+
+## 本地入口与未来拓扑
 
 ```text
-Internet / 校园网络 / 可选私有网络
-         │ TLS
-Reverse Proxy（沿用现有网站的 Caddy/Nginx/其他）
-    ├── 公共网站（原有）
-    ├── /internal       -> 成员平台 Web
-    ├── /api/v1         -> 模块化单体 API
-    └── Gitea 子域/路径（按正式部署文档）
-              │
-        业务数据库（本机）
-              │
-        GitHub/Gitea 连接器
+本地成员 http://localhost:8902
+    ├── /org      -> 成员网页（包括可信确认/审核）
+    └── /api/v1   -> 成员 API
+                         │
+                  独立成员 DB / 账号 / 会话
+
+本地考试 http://127.0.0.1:8901 -> 根 server / 独立考试 DB
 ```
 
-- 对外只暴露必要的 HTTPS 端口，Gitea SSH 服务如需开放须独立评估；数据库端口默认仅监听 loopback/容器网络。
-- 如果使用 Docker Compose，注意容器内存限制、日志轮转、healthcheck、持久卷以及宿主机剩余内存；少量 systemd 服务同样可行。
-- 优先继承现有官网认证及数据库技术栈。不要因为添加 Agent 入口，把官网整体重写或搬家。
+生产由获授权负责人另定独立服务/网络入口与 TLS；不以本页示例确定公网域名、`/internal` 或 `/recruitment` 路由。内置模型如后续启用只调用远端 API，不在本机推理。
+
+- 只暴露必要 HTTPS 端口；Gitea SSH 另审，DB 默认不开放公网。
+- 如使用 Compose，独立成员持久卷/配置/秘密、日志轮转/healthcheck/资源预算；systemd 独立服务同样可行。不能复用考试部署脚本或指向考试 DB。
+- 沿用 FastAPI/SQLite 技术不等于继承官网/考试认证和数据库；不重写或搬迁官网。
 
 ## 资源预算原则
 

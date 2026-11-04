@@ -32,10 +32,6 @@ def org_client(tmp_path, monkeypatch):
         require_org_identity(request, scope="applications:create")
         return {"ok": True}
 
-    @app.get("/exam/{cid}")
-    def exam(request: Request, cid: str):
-        return {"id": auth.require_applicant(request, cid)}
-
     with TestClient(app) as client:
         yield client
 
@@ -81,14 +77,14 @@ def test_admin_downgrade_revokes_old_web_and_cli(org_client):
 def test_current_role_not_session_snapshot_and_exam_compatibility(org_client):
     old = session("31000003", "admin")
     applicant = session("31000004", "applicant", changed=0)
-    assert org_client.get("/exam/2026", headers=applicant).status_code == 200
+    assert org_client.get("/exam/2026", headers=applicant).status_code == 404
     assert org_client.get("/identity", headers=applicant).status_code == 403
     with db.connection() as conn:
         conn.execute("UPDATE account SET role = 'applicant' WHERE student_id = '31000003'")
         conn.execute("UPDATE account SET role = 'member' WHERE student_id = '31000004'")
     assert org_client.get("/api/admin/accounts", headers=old).status_code == 401
     assert org_client.get("/api/auth/me", headers=old).status_code == 401
-    assert org_client.get("/exam/2026", headers=applicant).status_code == 401
+    assert org_client.get("/exam/2026", headers=applicant).status_code == 404
 
 
 def test_cli_scopes_isolation_replay_hash_and_revoke(org_client):

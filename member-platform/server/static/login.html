@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="referrer" content="no-referrer">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'none'; form-action 'self'">
+<title>内部成员服务 · 登录与账号管理</title>
+<link rel="stylesheet" href="css/org.css"><script src="login.js" defer></script>
+</head>
+<body data-prefix="__PREFIX__"><header><h1>内部成员服务</h1><a id="org-link" href="__PREFIX__/org">成员事务</a></header><main>
+<p>此服务与考试平台的账号、密码和会话独立。首次管理员须由维护人员显式 bootstrap，不提供默认账号或公开注册。</p>
+<p id="status" role="status" aria-live="polite"></p>
+<form id="login-form"><h2>成员登录</h2><label for="student-id">账号</label><input id="student-id" required maxlength="80" autocomplete="username"><label for="password">密码</label><input id="password" type="password" required autocomplete="current-password"><button type="submit">登录 / 切换账号</button></form>
+<section id="account" hidden><h2>当前账号</h2><p id="identity"></p><button id="logout" type="button">注销</button>
+<form id="password-form"><h3>修改密码（初始密码必须修改后才能进入成员事务）</h3><label for="old-password">当前密码</label><input id="old-password" type="password" required autocomplete="current-password"><label for="new-password">新密码（至少 12 字符）</label><input id="new-password" type="password" required minlength="12" autocomplete="new-password"><label for="repeat-password">确认新密码</label><input id="repeat-password" type="password" required minlength="12" autocomplete="new-password"><button type="submit">修改密码</button></form>
+</section>
+<section id="admin" hidden><h2>成员管理（管理员）</h2><button id="refresh-members" type="button">刷新成员</button><div id="members"></div>
+<form id="create-form"><h3>创建成员</h3><label for="create-id">账号（字母、数字、下划线、短横线）</label><input id="create-id" required pattern="[A-Za-z0-9_-]{1,80}"><label for="create-name">显示名</label><input id="create-name" maxlength="80"><label for="create-role">角色</label><select id="create-role"><option value="member">成员</option><option value="admin">管理员</option></select><button type="submit">创建并签发随机临时密码</button></form>
+<p>新建或重置密码只在下方临时展示一次，请通过可信私密渠道交付本人，不要复制到模型对话。修改角色和重置密码会立即撤销该成员所有网页会话、CLI 授权与待兑换 code。</p><output id="temporary-password"></output><button id="hide-password" type="button">隐藏临时密码</button>
+</section>
+</main></body></html>

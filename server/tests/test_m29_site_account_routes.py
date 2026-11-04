@@ -95,8 +95,14 @@ def test_nginx_site_accounts_reuse_legacy_proxy_chain(name):
     assert "proxy_pass" in text
 
 
-def test_nginx_org_api_keeps_namespace_without_standby_fallback():
-    text = (ROOT / "deploy" / "nginx-alethicinsight.vhost.conf").read_text(encoding="utf-8")
+@pytest.mark.parametrize("name", ["nginx-alethicinsight.vhost.conf", "nginx-recruitment.location.conf"])
+def test_nginx_member_api_fails_closed_without_explicit_member_upstream(name):
+    text = (ROOT / "deploy" / name).read_text(encoding="utf-8")
+    assert "location = /recruitment/api/v1 { return 503; }" in text
     location = text.split("location ^~ /recruitment/api/v1/ {", 1)[1].split("}", 1)[0]
-    assert "proxy_pass https://lab_origin/api/v1/;" in location
+    assert "return 503;" in location
+    assert "proxy_pass" not in location
     assert "error_page" not in location
+    assert "rewrite" not in location
+    assert "301" not in location
+    assert "302" not in location

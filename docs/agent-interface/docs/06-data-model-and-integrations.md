@@ -22,7 +22,9 @@ AuditEvent(id, principal_id, client_id, action, object_type, object_id,
 ClientGrant(id, principal_id, client_id, scopes, expiry, revoked_at)
 ```
 
-这里只是**逻辑契约**，不是要求一次建立所有实体表；能复用现有官网用户表就不要再建独立身份源。`Member` 映射现有 `account`，内部可继续以学号为主键，但 API 默认只暴露最小身份字段；`external_subject` 仅在未来接入外部身份源时使用。这里的 `Application` 是项目加入/资源等**事务申请**，不是现有招新 `application` 表；实现时建议使用 `ServiceRequest`/`service_request` 消除代码与数据库命名歧义，禁止借此读取招新评审资料。
+这里只是**逻辑契约**，不是要求一次建立所有实体表；Resource、RoleAssignment、RepoBinding 等仍含长期设计，不表示当前已实现。原“复用官网/招新用户表、不建立独立身份源”建议已撤销。成员产品在 `member-platform/server/` 维护自己的 DB 和 `account`，`Member` 仅映射成员库内账号，不关联或查询考试库；内部字段可保留兼容拼写，API 默认只暴露最小身份字段。`external_subject` 仅在未来经审查接入外部身份源时使用。
+
+这里的 `Application` 是项目加入等**事务申请**，不是招新 `application`；API 名不变，实际表名以成员实现为准，禁止借此读取招新评审资料。既有混合库的成员如何映射、去重、处理密码/授权和历史事务须另立数据迁移方案，本次不复制混合 DB、不迁移真实账号。
 
 ## 生命周期语义
 
@@ -60,7 +62,7 @@ ClientGrant(id, principal_id, client_id, scopes, expiry, revoked_at)
 
 ## 数据最小化与索引
 
-- 默认 PostgreSQL/SQLite 二选一，视现有官网 DB 决定；不要为了组织 Agent 建立完全独立的成员数据库。
+- 第一阶段沿用 SQLite 技术栈，但必须使用成员产品独立 DB，不取决于考试或官网 DB；未来更换数据库单独评审，不改变产品隔离。
 - 先用关系型数据库全文搜索或静态索引，不需要重型 Embedding/RAG 基础设施。
 - 不索引历史私聊、私人评价或完整私有项目代码，除非经专门的权限与数据处理审批。
 - 成员资料仅保留业务必要字段；不要把“兴趣/技能/时间安排”转化为隐性绩效评价体系。

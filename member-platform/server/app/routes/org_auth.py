@@ -39,8 +39,13 @@ def authorize(body: AuthorizationBody, request: Request, response: Response):
     expires_at = (now + timedelta(seconds=config.ORG_CLI_CODE_SECONDS)).isoformat()
     code = secrets.token_urlsafe(24)
     with db.connection() as conn:
+        conn.execute("BEGIN IMMEDIATE")
+        session = auth.lookup_session(conn, auth.bearer_token(request))
         account = conn.execute("SELECT * FROM account WHERE student_id = ?",
                                (identity.student_id,)).fetchone()
+        if (session is None or account is None or account["role"] not in ("member", "admin")
+                or not account["pw_changed"]):
+            raise auth.unauthorized()
         recent = conn.execute(
             "SELECT COUNT(*) FROM org_cli_authorization WHERE principal_id = ? AND created_at > ?",
             (identity.principal_id, (now - timedelta(minutes=10)).isoformat()),

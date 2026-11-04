@@ -3,15 +3,12 @@ import os
 from pathlib import Path
 import stat
 import subprocess
-import sys
 import time
 import types
 
 import pytest
 
 
-CLI_ROOT = Path(__file__).resolve().parents[2] / "infra" / "interface" / "alethicinsight-cli"
-sys.path.insert(0, str(CLI_ROOT))
 from alethicinsight_cli import credentials
 from alethicinsight_cli.client import CliError
 

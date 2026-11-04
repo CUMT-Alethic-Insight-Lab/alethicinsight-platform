@@ -15,8 +15,7 @@ from urllib.parse import parse_qs, urlsplit
 import pytest
 
 
-CLI_ROOT = Path(__file__).resolve().parents[2] / "infra" / "interface" / "alethicinsight-cli"
-sys.path.insert(0, str(CLI_ROOT))
+CLI_ROOT = Path(__file__).resolve().parents[1]
 from alethicinsight_cli import cli
 from alethicinsight_cli.client import CliError, normalize_base
 from alethicinsight_cli.credentials import CredentialStore
