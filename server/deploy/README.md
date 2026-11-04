@@ -16,9 +16,16 @@
   若使用 Cloudflare Pages/Worker 前置代理，也须放行 `/login`、`/account` 及其尾斜杠版本，
   同时继续回源 `/recruitment/*` 和 `/admin/recruitment`，不能让 Pages 的 SPA fallback 吞掉账号页。
   Pages 配置在官网独立仓，须随官网发布同步核验。
-- 组织接口：`/recruitment/api/v1/` 的读写始终回源 lab authoritative，不启用 cloud edge 热备回落；edge 应用层也拒写，避免主体、授权和事务双写。成员网页为 `/recruitment/org`，正式提交/审批响应禁止 iframe 嵌套。
-- 线上真实 vhost 快照：`nginx-alethicinsight.vhost.conf`（云端 `/etc/nginx/sites-available/alethicinsight`
-  的 2026-10-16 存档，含 lab_origin 长连接池与热备回落；改线上 nginx 时同步更新此文件）
+- 考试进程不再提供 `/api/v1`、`/org` 或组织静态资源。`auth/profile/member` 及
+  `membership` 仅保留历史考生账号和资料兼容，不是成员产品的账号源或权限服务。
+- 成员 API 旧公网地址 `/recruitment/api/v1`（含所有子路径）在两份 nginx 模板中默认
+  返回 503（fail closed），不回源考试 lab authoritative，也不回落考试 cloud edge。
+  启用旧地址前必须显式配置独立成员产品上游；这是服务端反向代理，**不是 HTTP 重定向**，
+  应保留方法、请求体和查询参数，将旧前缀映射到成员进程的 `/api/v1`，独立配置其
+  Host/SNI/认证，不得复用考试主库或考试会话。成员产品上游不可用时也不得转到考试进程。
+- `nginx-alethicinsight.vhost.conf` 以云端 2026-10-16 存档为基础，现为待审查部署模板，
+  含 lab_origin 考试长连接池和热备回落。仓库修改不代表线上已安装；本次隔离没有部署、
+  迁移账号或搬运数据库。须先审查隔离 PR，再单独审批成员上游和 nginx 发布。
 - 数据目录：`/var/www/recruitment/data`（sqlite，跨 release 持久，属主 www-data）
 - venv：`/var/www/recruitment/venv`（跨 release 复用）
 - 发布目录：`/var/www/recruitment/releases/<YYYYmmdd-HHMMSS>`，`current` 软链指向当前版
@@ -101,12 +108,18 @@ LAB_HOST=<user@host> SSH_KEY=<私钥路径> \
 脚本在任何 SSH 上传之前检查该目录和接收机文件；缺失即退出，不自动克隆、不下载
 未锁定版本，也不回退读取旧工作区。应用打包范围仍为 `app static requirements.txt`，
 接收机目标路径、systemd 单元、服务重启和健康检查保持不变。
-`push-server.sh` 不打包套件，无需 `EXAM_KIT_DIR`；nginx 与生产配置不因分仓改变。
+`push-server.sh` 不打包套件，无需 `EXAM_KIT_DIR`；接收机分仓本身不改变考试代理，
+成员运行隔离的 nginx 模板变更另行审查、发布，不代表生产配置已变更。
 
 发布前记录平台 commit/tag、套件 commit/tag、安装包版本/SHA256，分别运行两仓测试，
-并在隔离环境验证登录、交卷、报告及使用到的 LAN/P2P 通路。公共 CLI 接口仍归平台
-[infra/interface/alethicinsight-cli](https://github.com/CUMT-Alethic-Insight-Lab/alethicinsight-platform/tree/main/infra/interface/alethicinsight-cli)
-维护，不随接收机一起打包，也不另拆 MCP。
+并在隔离环境验证登录、交卷、报告及使用到的 LAN/P2P 通路。成员 CLI/MCP 属于内部
+成员产品的同包 infra，不是考试运行依赖，不随考试服务或接收机打包。
+
+考试新库只创建考试表及历史账号/资料兼容表，不再创建 `org_*`、`service_request`
+或 `service_request_review`。启动旧库不删除、迁移或同步旧组织表和真实账号；旧组织
+数据仍留在原库，不能据此宣称成员数据已经迁移。成员产品必须使用独立运行环境、
+数据库和账号生命周期，真实数据迁移需另行审计审批。考试交卷的
+`/api/internal/ingest-staged` 仍仅在 authoritative 进程挂载，不属于成员内部 API。
 
 回滚应用时恢复旧 `current`；接收机当前是原地覆盖而非 release 软链，必须从之前记录的
 套件 commit/tag 恢复 `/srv/alethic/receiver/session_receiver.py` 并重启接收机，不能只
