@@ -12,7 +12,6 @@ from .client import CliError, Client, normalize_base, safe_output
 from .credentials import CredentialStore
 
 
-DEFAULT_BASE = "https://alethicinsight.com/recruitment"
 DEFAULT_SCOPES = ["profile:read:self", "projects:read", "knowledge:read", "applications:read:self"]
 
 
@@ -177,7 +176,7 @@ def main(argv=None):
     exit_code = 0
     try:
         args = parser().parse_args(argv)
-        base = normalize_base(os.environ.get("ALETHICINSIGHT_API_BASE_URL", os.environ.get("ALETHIC_API_BASE_URL", os.environ.get("ALETHIC_BASE_URL", DEFAULT_BASE))))
+        base = normalize_base(os.environ.get("ALETHICINSIGHT_API_BASE_URL", os.environ.get("ALETHIC_API_BASE_URL", os.environ.get("ALETHIC_BASE_URL"))))
         client = Client(base)
         payload = execute(args, client, CredentialStore())
     except CliError as exc:

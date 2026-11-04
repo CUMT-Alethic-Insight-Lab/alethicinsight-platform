@@ -4,6 +4,9 @@ import urllib.parse
 import urllib.request
 
 
+BASE_CONFIGURATION_MESSAGE = "Set ALETHICINSIGHT_API_BASE_URL to the member service base URL (without /api/v1); no default service address is configured."
+
+
 class CliError(Exception):
     def __init__(self, code, message, exit_code, **details):
         super().__init__(message)
@@ -17,6 +20,8 @@ class NoRedirect(urllib.request.HTTPRedirectHandler):
 
 
 def normalize_base(value):
+    if value is None or isinstance(value, str) and not value.strip():
+        raise CliError("CONFIGURATION_REQUIRED", BASE_CONFIGURATION_MESSAGE, 2)
     try:
         if not isinstance(value, str) or any(c.isspace() or ord(c) < 32 for c in value):
             raise ValueError()

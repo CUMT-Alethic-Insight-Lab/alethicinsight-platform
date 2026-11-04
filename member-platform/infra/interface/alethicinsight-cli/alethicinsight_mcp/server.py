@@ -9,6 +9,8 @@ import tempfile
 from dataclasses import dataclass
 from typing import BinaryIO
 
+from alethicinsight_cli.client import BASE_CONFIGURATION_MESSAGE
+
 from . import __version__
 
 SUPPORTED_PROTOCOLS = ("2024-11-05", "2025-03-26", "2025-06-18")
@@ -180,6 +182,16 @@ class CliRunner:
                                          stdout=output, stderr=subprocess.DEVNULL,
                                          timeout=self.timeout, env=environment, shell=False)
                 if process.returncode:
+                    if process.returncode == 2:
+                        output.seek(0)
+                        raw = output.read(MAX_CLI_BYTES + 1)
+                        try:
+                            data = json.loads(raw.decode("utf-8"), parse_constant=reject_constant) if len(raw) <= MAX_CLI_BYTES else None
+                        except (ValueError, UnicodeError, RecursionError):
+                            data = None
+                        error = data.get("error") if isinstance(data, dict) else None
+                        if isinstance(error, dict) and error.get("code") == "CONFIGURATION_REQUIRED":
+                            return tool_error("CONFIGURATION_REQUIRED", BASE_CONFIGURATION_MESSAGE)
                     return tool_error(*EXIT_ERRORS.get(process.returncode,
                                       ("CLI_FAILED", "The CLI operation failed.")))
                 output.seek(0)
