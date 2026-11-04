@@ -83,6 +83,36 @@ systemd 单元在 `deploy/lab/` 下：主服务、数据回收 timer、以及机
 局域网接收机 `alethic-session-receiver.service`（考试机 upload_mode=lan
 时接收清洗后的轨迹文档）。
 
+### 分仓后的接收机来源
+
+接收机源码权威为独立公共仓
+[recruitment-exam-kit](https://github.com/CUMT-Alethic-Insight-Lab/recruitment-exam-kit)，
+不再从平台的 `exam_kit/` 打包。先检出并验证与平台配套的套件 commit/tag，再将
+`EXAM_KIT_DIR` 设为含 `session_receiver.py` 的**绝对目录**（Git Bash 使用 `P:/...`
+或 `/p/...` 路径；不是旧 monorepo 根目录）：
+
+```bash
+# 仅为部署命令模板；须按发布审批流程执行，本次分仓不运行部署
+LAB_HOST=<user@host> SSH_KEY=<私钥路径> \
+  EXAM_KIT_DIR=/absolute/path/to/recruitment-exam-kit \
+  bash server/deploy/push-lab.sh
+```
+
+脚本在任何 SSH 上传之前检查该目录和接收机文件；缺失即退出，不自动克隆、不下载
+未锁定版本，也不回退读取旧工作区。应用打包范围仍为 `app static requirements.txt`，
+接收机目标路径、systemd 单元、服务重启和健康检查保持不变。
+`push-server.sh` 不打包套件，无需 `EXAM_KIT_DIR`；nginx 与生产配置不因分仓改变。
+
+发布前记录平台 commit/tag、套件 commit/tag、安装包版本/SHA256，分别运行两仓测试，
+并在隔离环境验证登录、交卷、报告及使用到的 LAN/P2P 通路。公共 CLI 接口仍归平台
+[infra/interface/alethicinsight-cli](https://github.com/CUMT-Alethic-Insight-Lab/recruitment-exam-platform/tree/main/infra/interface/alethicinsight-cli)
+维护，不随接收机一起打包，也不另拆 MCP。
+
+回滚应用时恢复旧 `current`；接收机当前是原地覆盖而非 release 软链，必须从之前记录的
+套件 commit/tag 恢复 `/srv/alethic/receiver/session_receiver.py` 并重启接收机，不能只
+回滚平台就宣称两者均回滚。真实部署凭据与接收数据不进入任一公共仓。
+源码移除的回滚走 revert PR，原本地考试套件目录保留。
+
 ## 安装回收定时器
 
 `app.maintenance` 会删除 `expires_at` 已过期的批次数据（uploads 目录、

@@ -28,7 +28,7 @@
 
 - `Alethic-Insight-Frontend-Templates` 完全不碰：不编辑、不移动、不调整仓库职责。
 - `E:/projects/Aletheion` 仅为历史来源，不作为 monorepo；其中可复用材料也需单独确认来源、许可、提交状态和敏感性。
-- 保持现有 `server/`、`exam_kit/` 的业务职责；本次不建议立刻拆 exam-kit，也不以整理为由迁移真实数据或部署生产。
+- 平台保留 `server/`、整个 `infra/interface/alethicinsight-cli/` 与组织接口；考生端已独立至公共 [recruitment-exam-kit](https://github.com/CUMT-Alethic-Insight-Lab/recruitment-exam-kit)，平台不再跟踪 `exam_kit/`。私有招新物料归已发布的 `recruitment-materials`，各项目保留 README。本次不修改新 kit 仓、不迁移真实数据、不部署生产；源码验证不代表完整安装器已重建。
 - P: / E: 本地位置不等于远程仓库职责。先保护未提交与未跟踪内容，再确定目标仓和工作副本；不直接合并整个历史目录。
 
 相关入口：[根 README](../README.md)、[本地 MVP 手册](AGENT_INTERFACE_MVP.md)、[接口架构](agent-interface/docs/02-architecture.md)。

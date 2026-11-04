@@ -13,7 +13,7 @@
 
 应用内部新路由为 `/api/v1`，本地根地址 `http://127.0.0.1:8901`；公网预期根地址 `https://<host>/recruitment`，反代 strip 后到相同内部路由。`PUBLIC_PREFIX=/recruitment` 用于网页链接，不给 APIRouter 再加此前缀。CLI base 是服务根，**不含 `/api/v1`**。
 
-保留旧 `/api/auth/*`、`/api/campaigns/*`、招新报名/机试/评审和 exam_kit，不将其数据暴露到组织知识接口。组织事务与旧招新 application 分开。网页沿用 Bearer session；CLI 是一次性 code 交换的独立短时 grant，不是 OAuth/OIDC。只有当前 member/admin 可用组织接口；网页管理还要当前 admin，CLI 不授予 review。
+保留旧 `/api/auth/*`、`/api/campaigns/*`、招新报名/机试/评审和 exam-kit API 合约，不将其数据暴露到组织知识接口。考生端源码现归独立公共 [recruitment-exam-kit](https://github.com/CUMT-Alethic-Insight-Lab/recruitment-exam-kit)；下文 PR #3 的 `cd exam_kit` 测试记录为分仓前历史结果，不是当前平台内的测试入口。组织事务与旧招新 application 分开。网页沿用 Bearer session；CLI 是一次性 code 交换的独立短时 grant，不是 OAuth/OIDC。只有当前 member/admin 可用组织接口；网页管理还要当前 admin，CLI 不授予 review。
 
 本次不交付 Gitea、远程 MCP、官网内置模型或真实 Agent 兼容性认证。其他方案文件里的设备借用、`--confirm` 和通用表单示例不是本次可执行命令。
 

@@ -1,6 +1,14 @@
 # Alethic Insight 招新平台 — 流程与接口形态梳理（粗粒度）
 
 > 定位：本文档只做流程与接口形态的顶层设计，供后续交代 coding agent 逐模块实现。不锁定技术栈，只锁定数据流与契约。
+>
+> 分仓说明：M2 安装包、M3 本地会话清洗/上传及 LAN 接收机的源码、测试与发布已归
+> [recruitment-exam-kit](https://github.com/CUMT-Alethic-Insight-Lab/recruitment-exam-kit)，
+> 不再位于本仓 `exam_kit/`。服务端 API、暂存转发与报告重建仍归本仓；公共 CLI 接口归
+> [infra/interface/alethicinsight-cli](https://github.com/CUMT-Alethic-Insight-Lab/recruitment-exam-platform/tree/main/infra/interface/alethicinsight-cli)，
+> 不另拆 MCP。本文为设计资料，当前行为以各仓实现/测试为准；版本兼容、私有数据边界与回滚见
+> [根 README](../README.md)。安装器构建/测试见 [套件 README](https://github.com/CUMT-Alethic-Insight-Lab/recruitment-exam-kit#readme)，
+> 下载与校验以 [套件发布记录](https://github.com/CUMT-Alethic-Insight-Lab/recruitment-exam-kit/releases) 为准。
 
 ## 0. 核心设计原则
 

@@ -57,7 +57,7 @@ Worker 到 lab-origin 的 fetch 全程在 Cloudflare 骨干网内部完成，省
 - 交卷端点 `POST /api/campaigns/{cid}/sessions`（`server/app/routes/uploads.py`），
   multipart：`cleaned`（.jsonl/.md 清洗件）+ 可选 `attachment`（zip）。
 - 附件 zip 双端硬上限 50MB：`server/app/constants.py` `MAX_ATTACHMENT_BYTES =
-  50 * 1024 * 1024`（413 超限），`exam_kit/exam_server.py` `ATTACHMENT_MAX_BYTES`
+  50 * 1024 * 1024`（413 超限），独立 [recruitment-exam-kit 的 `exam_server.py`](https://github.com/CUMT-Alethic-Insight-Lab/recruitment-exam-kit/blob/main/exam_server.py) `ATTACHMENT_MAX_BYTES`
   同值。multipart 总 body 理论上限 ≈ 52MB。
 - 实测 VPS `data/uploads`（standby 同步副本）：47 个文件共 **4.9MB**，单文件
   1–2MB（cleaned_q*.jsonl）。当前量纲下附件 zip 尚未出现大文件。

@@ -3,6 +3,13 @@
 状态：草案 · 2026-10-16
 范围：`AlethicInsight-ExamKit-2026-setup.exe`（约 331MB，Cloudflare R2，自定义域 `dl.alethicinsight.com`）的下载鉴权。
 
+> 分仓注：本文保留历史调研与代码草稿，不代表当前发布状态。套件源码已迁至
+> [recruitment-exam-kit](https://github.com/CUMT-Alethic-Insight-Lab/recruitment-exam-kit)，
+> 文中的 `recruitment-exam-kit/exam_server.py` 是独立仓根目录的 `exam_server.py`，历史行号仅供追溯。
+> 套件构建/测试见 [套件 README](https://github.com/CUMT-Alethic-Insight-Lab/recruitment-exam-kit#readme)，
+> 下载、版本和校验以 [Releases](https://github.com/CUMT-Alethic-Insight-Lab/recruitment-exam-kit/releases) 为准；
+> 平台保留签发端点和 OTA 元数据。分仓兼容、接口归属与回滚见 [根 README](../README.md)。
+
 ---
 
 ## 1. 现状摸底
@@ -27,9 +34,9 @@
 1. **官网入口页**：`server/static/index.html:766` —— 末页「机试入口」slide 里
    **硬编码**的 `<a class="entry-btn" href="https://dl.alethicinsight.com/AlethicInsight-ExamKit-2026-setup.exe">下载机试安装包</a>`。
    注意：它**不读** kit-version.json，URL 在两处各写一份。
-2. **机试包 OTA**：`exam_kit/exam_server.py:1109` `check_kit_update()` 周期轮询
+2. **机试包 OTA**：[独立套件 `exam_server.py`](https://github.com/CUMT-Alethic-Insight-Lab/recruitment-exam-kit/blob/main/exam_server.py)（历史行号 1109） `check_kit_update()` 周期轮询
    `{cloud_base}/static/kit-version.json`（匿名 GET），发现新版本后由
-   `download_kit_installer()`（`exam_kit/exam_server.py:1221`）用 curl 直接拉
+   `download_kit_installer()`（`recruitment-exam-kit/exam_server.py:1221`）用 curl 直接拉
    `info["url"]` 落盘并校验 sha256。此路径当前同样**不带任何凭证**。
 
 ### 1.3 「暂停下载」的现状实现
@@ -350,7 +357,7 @@ return Response.redirect(signed.url, 302);
 两者安全性等价（都只有验签通过才拿得到数据）。默认建议 5.2：依赖最少、
 域名不露底、Range 语义最直白；「Worker 不中转流量」若被上升为硬约束再切 5.3。
 
-### 5.4 exam_kit OTA 适配草稿（`exam_kit/exam_server.py`）
+### 5.4 exam_kit OTA 适配草稿（`recruitment-exam-kit/exam_server.py`）
 
 ```python
 def _resolve_kit_download_url(cfg: dict, info: dict) -> str:
