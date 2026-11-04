@@ -105,17 +105,55 @@ def test_explicit_bootstrap_login_management_and_revocation(member_client):
         assert len(conn.execute("SELECT pw_hash FROM account LIMIT 1").fetchone()[0]) == 64
 
 
-@pytest.mark.parametrize("table", ["campaign", "application", "question", "exam_session", "exam_score", "interview_score", "interview_slot", "admin_user", "unrelated"])
+def database_state(path):
+    with sqlite3.connect(path) as conn:
+        schema = conn.execute("SELECT type, name, tbl_name, rootpage, sql FROM sqlite_master ORDER BY type, name").fetchall()
+        identity = conn.execute("PRAGMA application_id").fetchone()[0]
+    return path.read_bytes(), schema, identity
+
+
+@pytest.mark.parametrize("table", ["campaign", "application", "question", "exam_session", "exam_score", "interview_score", "interview_slot", "admin_user", "unrelated", "sqliteXexternal"])
 def test_refuse_exam_or_unknown_database_without_mutation(tmp_path, monkeypatch, table):
     path = tmp_path / "foreign.db"
     with sqlite3.connect(path) as conn:
         conn.execute(f"CREATE TABLE {table} (id TEXT)")
         conn.execute(f"INSERT INTO {table} VALUES ('untouched')")
-    before = path.read_bytes()
+    before = database_state(path)
     monkeypatch.setattr(config, "DB_PATH", path)
     with pytest.raises(RuntimeError, match="Refusing"):
         db.init_db()
-    assert path.read_bytes() == before
+    assert database_state(path) == before
+
+
+@pytest.mark.parametrize("schema", [
+    "CREATE VIEW external_accounts AS SELECT 'foreign' AS student_id;",
+    "CREATE VIEW sqliteXexternal AS SELECT 'foreign' AS student_id;",
+    "CREATE TABLE account (student_id TEXT); CREATE INDEX member_lookup ON account(student_id);",
+    "CREATE TABLE account (student_id TEXT); CREATE TRIGGER member_insert AFTER INSERT ON account BEGIN SELECT 1; END;",
+], ids=["view-only", "sqlite-like-view", "index", "trigger"])
+def test_refuse_unmarked_user_schema_without_mutation(tmp_path, monkeypatch, schema):
+    path = tmp_path / "unmarked.db"
+    with sqlite3.connect(path) as conn:
+        conn.executescript(schema)
+    before = database_state(path)
+    assert before[2] == 0
+    monkeypatch.setattr(config, "DB_PATH", path)
+    with pytest.raises(RuntimeError, match="unmarked"):
+        db.init_db()
+    assert database_state(path) == before
+
+
+def test_marked_member_database_preserves_user_indexes(member_client):
+    with db.connection() as conn:
+        conn.execute("CREATE INDEX member_role_lookup ON account(role)")
+        conn.execute("CREATE UNIQUE INDEX sqliteXmember_lookup ON account(student_id)")
+        conn.execute("INSERT INTO account (student_id, created_at, updated_at) VALUES ('indexed-member', '', '')")
+    before = database_state(config.DB_PATH)
+    db.init_db()
+    with db.connection() as conn:
+        assert conn.execute("SELECT student_id FROM account INDEXED BY member_role_lookup WHERE role='member'").fetchone()[0] == "indexed-member"
+        assert conn.execute("SELECT student_id FROM account INDEXED BY sqliteXmember_lookup WHERE student_id='indexed-member'").fetchone()[0] == "indexed-member"
+    assert database_state(config.DB_PATH)[1:] == before[1:]
 
 
 def test_refuse_unmarked_account_database_and_wrong_identity(tmp_path, monkeypatch):
@@ -123,17 +161,21 @@ def test_refuse_unmarked_account_database_and_wrong_identity(tmp_path, monkeypat
     with sqlite3.connect(path) as conn:
         conn.execute("CREATE TABLE account (student_id TEXT)")
     monkeypatch.setattr(config, "DB_PATH", path)
+    before = database_state(path)
     with pytest.raises(RuntimeError, match="unmarked"):
         db.init_db()
+    assert database_state(path) == before
     with sqlite3.connect(path) as conn:
         conn.execute("PRAGMA application_id=123")
+    before = database_state(path)
     with pytest.raises(RuntimeError, match="identity"):
         db.init_db()
+    assert database_state(path) == before
 
 
 def test_only_member_tables_no_exam_routes_no_exam_lifecycle(member_client):
     with db.connection() as conn:
-        tables = {r[0] for r in conn.execute("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'")}
+        tables = {r[0] for r in conn.execute("SELECT name FROM sqlite_master WHERE type='table' AND substr(name, 1, 7) != 'sqlite_'")}
         assert tables == db.ALLOWED_TABLES
         assert conn.execute("PRAGMA application_id").fetchone()[0] == db.APPLICATION_ID
         assert "campaign_id" not in {r[1] for r in conn.execute("PRAGMA table_info(login_session)")}

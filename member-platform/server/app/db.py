@@ -73,11 +73,16 @@ ALLOWED_TABLES = {
 
 
 def _guard(conn, initializing=False):
-    tables = {r[0] for r in conn.execute("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'")}
+    schema = conn.execute(
+        "SELECT type, name FROM sqlite_master"
+        " WHERE type IN ('table', 'view', 'trigger', 'index')"
+        " AND substr(name, 1, 7) != 'sqlite_'"
+    ).fetchall()
+    tables = {row[1] for row in schema if row[0] == 'table'}
     identity = conn.execute("PRAGMA application_id").fetchone()[0]
     if tables - ALLOWED_TABLES or identity not in (0, APPLICATION_ID):
         raise RuntimeError("Refusing non-member database (exam/unknown tables or identity)")
-    if (tables or not initializing) and identity != APPLICATION_ID:
+    if (schema or not initializing) and identity != APPLICATION_ID:
         raise RuntimeError("Refusing unmarked database; use a fresh member database, never import exam accounts")
 
 
