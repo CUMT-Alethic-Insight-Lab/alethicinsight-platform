@@ -88,7 +88,7 @@ global.document = {body, createElement: tag => new Element(tag), getElementById:
 global.location = {pathname: config.path, search: '?request_id=cli-request-123456'};
 global.window = {addEventListener() {}};
 const secret = 'WEB_BEARER_MUST_NEVER_APPEAR_IN_DOM';
-global.localStorage = {getItem: key => key === 'alethic_session' ? secret : null};
+global.localStorage = {getItem: key => key === 'member_platform_session_v1' ? secret : null};
 const calls = [];
 const preview = {kind:'project-join', form_revision:'1', fields:{project_id:'p1', motivation:'A useful contribution', weekly_hours:3, notes:''}};
 let failed = false;

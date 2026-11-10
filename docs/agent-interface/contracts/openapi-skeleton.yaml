@@ -3,16 +3,15 @@ info:
   title: Alethic Insight Organization API MVP
   version: 0.1.0-mvp
   description: >-
-    Local MVP contract; not a production deployment claim. Legacy /api routes
-    remain unchanged. Web uses the existing opaque Bearer session; CLI uses a
-    separate short-lived grant exchanged with a one-time code, NOT OAuth/OIDC.
-    Current account role must be member/admin. CLI cannot issue confirmations
-    or review applications. Verify exact responses against integrated /openapi.json.
+    Independent member-product local MVP contract, not a deployment claim.
+    Recruitment legacy APIs belong to the separate exam service. Web uses a
+    member-service opaque Bearer session; CLI uses a separate short-lived grant
+    exchanged with a one-time code, NOT OAuth/OIDC. Current member-service account
+    role must be member/admin. CLI cannot issue confirmations or review applications.
+    Verify exact responses against the member service /openapi.json after integration.
 servers:
-  - url: http://127.0.0.1:8901/api/v1
-    description: Isolated local development only
-  - url: /recruitment/api/v1
-    description: Expected public proxy prefix; production deployment requires human approval
+  - url: http://localhost:8902/api/v1
+    description: Explicit local member API root; CLI service base is http://localhost:8902
 security:
   - bearerAuth: []
 paths:

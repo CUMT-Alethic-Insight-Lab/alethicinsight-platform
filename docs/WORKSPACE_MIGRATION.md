@@ -1,6 +1,6 @@
 # 本地工作区保全与迁移清单
 
-这是 PR #3 保留的历史人工操作清单，**不是已执行的迁移记录**，下文“当前”“本次”及未勾选项均指该接口任务。PR #4 已跟进合并 main：公共考试套件与私有招新物料仓均已发布，平台移除旧 `exam_kit/` 跟踪文件，保留 `infra/` 与组织接口；当前归属以[根 README](../README.md)和[仓库职责与公开边界](REPOSITORY_BOUNDARIES.md)为准。本次收尾不移动目录、不改其他工作副本、不读真实凭据、不部署生产。
+这是从 PR #3 历史人工清单修订的保全门禁，**不是已执行的工作区或真实数据迁移记录**。原方案把组织接口增量并入招新平台、保留根 `infra/`，现已撤销；历史事实见[迁移记录](migration.md)。当前纠正先在同仓 `member-platform/` 独立成员 server 与 infra，根 `server/` 仅考试，PR 审查后才决定独立仓与远端映射。`alethicinsight-platform` 历史误改名本次不纠名，不创建新仓 URL，不动原脏主仓、不读秘密、不部署、不迁移真实账号。以下方框均是操作前门禁，不是完成标记。
 
 ## 1. 先识别，不先搬家
 
@@ -26,11 +26,11 @@
 
 - [ ] 如后续需要独立副本，先在新目标创建 clone，再通过已审核的提交/补丁恢复代码；单独保全不宜入 Git 的资料，不把复制 `.git` 关联文件当成新 clone。
 - [ ] 如后续需要 worktree，由负责人使用 Git worktree 管理命令并核对共享主仓；现有 worktree 不自行挪位置。本次不执行 worktree move/remove/prune。
-- [ ] 每个 coder 只操作分配的 worktree 与文件范围，不修改主工作区。当前实现分支为 `feat/agent-interface-mvp`；是否推送由主代理统一核验，不在此任务推送。
+- [ ] 每个 coder 只操作分配的 worktree 与文件范围，按授权提交自己路径，不修改原脏主仓或推送。`feat/agent-interface-mvp` 仅是旧任务分支历史，不是当前隔离执行入口。
 
-## 4. 先复制验证，再切换
+## 4. 先隔离验证，再审议仓库映射
 
-- [ ] 目标布局先书面核对：公共 CLI/MCP 在 `infra/interface/alethicinsight-cli/` 单包，私有运维资料归 `infra-handoff`；不创建独立 MCP 仓，不立刻拆 exam-kit。
+- [ ] 目标布局书面核对：根 `server/` 仅考试；`member-platform/server/` 独立成员产品与 DB/账号/会话；CLI/MCP 同包归 `member-platform/infra/interface/alethicinsight-cli/`。私有运维归 `infra-handoff`，不建独立 MCP 仓。exam-kit 已独立，不恢复旧目录；先审查同仓隔离 PR，再决定远端/独立仓映射。
 - [ ] 在新目标准备可回退的副本，保留来源，不使用剪切、覆盖或删除作为第一步。先确认空间、私有权限与排除项，不把真实数据复制到公开仓。
 - [ ] 对非敏感源码核验提交历史/HEAD、文件差异、未提交内容恢复情况、依赖与本地链接；检查新路径的打包入口与版本一致性。
 - [ ] 在隔离数据和新临时凭据目录中安装单包，验证 `alethicinsight-cli --help`、`alethicinsight-mcp --help`、项目标准测试，以及 loopback 合成数据 CLI/MCP 闭环；不沿用生产数据库或真实凭据。

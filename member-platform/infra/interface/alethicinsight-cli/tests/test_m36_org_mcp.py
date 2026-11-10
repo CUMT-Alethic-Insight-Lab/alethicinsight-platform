@@ -7,7 +7,7 @@ import sys
 import pytest
 
 
-ADAPTER = Path(__file__).resolve().parents[2] / "infra" / "interface" / "alethicinsight-cli"
+ADAPTER = Path(__file__).resolve().parents[1]
 INITIALIZE = {"jsonrpc": "2.0", "id": 1, "method": "initialize", "params": {
     "protocolVersion": "2025-06-18", "capabilities": {},
     "clientInfo": {"name": "m36-test", "version": "1"}}}
@@ -295,12 +295,12 @@ def test_real_cli_against_loopback_http_uses_no_credentials_in_mcp(tmp_path, mon
     try:
         responses, raw = exchange((wrapper, tmp_path / "unused"), [INITIALIZE, READY,
             call("org_search_knowledge", {"query": query}),
-            call("org_prepare_application", {"form_revision": "1", "fields": fields}, 3)], timeout=3)
+            call("org_prepare_application", {"form_revision": "1", "fields": fields}, 3)], timeout=15)
     finally:
         server.shutdown()
         server.server_close()
         thread.join(timeout=5)
-    assert all(item["result"]["isError"] is False for item in responses[1:])
+    assert all(item["result"]["isError"] is False for item in responses[1:]), responses
     assert tool_data(responses[1])["items"][0]["query"] == query
     assert tool_data(responses[2])["submitted"] is False
     assert tool_data(responses[2])["draft"]["preview"]["fields"] == fields
@@ -388,3 +388,110 @@ def test_installed_default_runner_never_executes_cwd_shadow(
     responses = [json.loads(line) for line in result.stdout.splitlines()]
     assert tool_data(responses[-1])["error"]["code"] == "AUTH_REQUIRED"
     assert not marker.exists()
+
+
+def installed_command(python, name):
+    return str(python.parent / (name + ".exe" if os.name == "nt" else name))
+
+
+def test_installed_wheel_metadata_and_both_console_entries(installed_python, tmp_path):
+    result = subprocess.run([
+        str(installed_python), "-I", "-c",
+        "import importlib.metadata as m; from alethicinsight_cli import __version__; "
+        "from alethicinsight_mcp import __version__ as mv; "
+        "d=m.distribution('alethicinsight-cli'); "
+        "assert d.version == __version__ == mv == '0.1.1'; "
+        "assert {e.name for e in d.entry_points} == {'alethicinsight-cli', 'alethicinsight-mcp'}; "
+        "assert not [r for r in d.requires or [] if 'extra ==' not in r]",
+    ], capture_output=True, text=True, cwd=tmp_path, timeout=20)
+    assert result.returncode == 0, result.stdout + result.stderr
+    for name in ("alethicinsight-cli", "alethicinsight-mcp"):
+        result = subprocess.run([installed_command(installed_python, name), "--help"],
+                                capture_output=True, text=True, cwd=tmp_path, timeout=20)
+        assert result.returncode == 0, result.stderr
+        assert name in result.stdout
+
+
+@pytest.mark.parametrize("variable", [None, "ALETHICINSIGHT_API_BASE_URL", "ALETHIC_API_BASE_URL", "ALETHIC_BASE_URL"])
+def test_installed_entries_report_missing_configuration(installed_python, tmp_path, monkeypatch, variable):
+    if variable:
+        monkeypatch.setenv(variable, "")
+    environment = dict(os.environ)
+    result = subprocess.run([
+        installed_command(installed_python, "alethicinsight-cli"), "capabilities", "--json",
+    ], capture_output=True, text=True, cwd=tmp_path, env=environment, timeout=20)
+    assert result.returncode == 2
+    assert json.loads(result.stdout)["error"]["code"] == "CONFIGURATION_REQUIRED"
+    assert result.stderr == ""
+    wire = "".join(json.dumps(message) + "\n" for message in (
+        INITIALIZE, READY, call("org_capabilities"), request("ping", request_id=3)))
+    result = subprocess.run([
+        installed_command(installed_python, "alethicinsight-mcp"),
+    ], input=wire, capture_output=True, text=True, cwd=tmp_path, env=environment, timeout=20)
+    assert result.returncode == 0, result.stderr
+    assert result.stderr == ""
+    responses = [json.loads(line) for line in result.stdout.splitlines()]
+    assert responses[0]["result"]["serverInfo"]["version"] == "0.1.1"
+    assert responses[1]["result"]["isError"] is True
+    assert tool_data(responses[1])["error"]["code"] == "CONFIGURATION_REQUIRED"
+    assert "ALETHICINSIGHT_API_BASE_URL" in tool_data(responses[1])["error"]["message"]
+    assert responses[2]["result"] == {}
+
+
+def test_installed_console_entries_reach_loopback_http(installed_python, tmp_path, monkeypatch):
+    from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+    import threading
+
+    calls = []
+    token = "installed-wheel-synthetic-only"
+
+    class Handler(BaseHTTPRequestHandler):
+        def log_message(self, *args):
+            pass
+
+        def do_GET(self):
+            calls.append((self.path, self.headers.get("Authorization")))
+            body = json.dumps({"capabilities": ["projects:read"]}).encode()
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+
+    server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    base = f"http://127.0.0.1:{server.server_port}/member"
+    monkeypatch.setenv("ALETHICINSIGHT_API_BASE_URL", base)
+    monkeypatch.setenv("ALETHICINSIGHT_CONFIG_DIR", str(tmp_path / "synthetic-config"))
+    environment = dict(os.environ)
+    try:
+        result = subprocess.run([
+            str(installed_python), "-I", "-c",
+            "import os; from alethicinsight_cli.credentials import CredentialStore; "
+            f"CredentialStore().save(os.environ['ALETHICINSIGHT_API_BASE_URL'], "
+            f"{{'token': {token!r}, 'expires_at': 4102444800, 'scopes': ['projects:read']}})",
+        ], capture_output=True, text=True, cwd=tmp_path, env=environment, timeout=30)
+        assert result.returncode == 0, result.stderr
+        result = subprocess.run([
+            installed_command(installed_python, "alethicinsight-cli"), "capabilities", "--json",
+        ], capture_output=True, text=True, cwd=tmp_path, env=environment, timeout=30)
+        assert result.returncode == 0, result.stderr
+        assert json.loads(result.stdout) == {"capabilities": ["projects:read"]}
+        assert token not in result.stdout + result.stderr
+        wire = "".join(json.dumps(message) + "\n" for message in (
+            INITIALIZE, READY, call("org_capabilities")))
+        result = subprocess.run([
+            installed_command(installed_python, "alethicinsight-mcp"),
+        ], input=wire, capture_output=True, text=True, cwd=tmp_path, env=environment, timeout=30)
+        assert result.returncode == 0, result.stderr
+        assert result.stderr == ""
+        responses = [json.loads(line) for line in result.stdout.splitlines()]
+        assert responses[-1]["result"]["isError"] is False
+        assert tool_data(responses[-1]) == {"capabilities": ["projects:read"]}
+        assert token not in result.stdout
+        assert calls == [("/member/api/v1/capabilities", "Bearer " + token)] * 2
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=5)

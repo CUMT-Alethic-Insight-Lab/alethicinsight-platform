@@ -32,12 +32,12 @@
     $(id).classList.toggle('error', Boolean(error));
   }
   function bearer() {
-    try { return localStorage.getItem('alethic_admin_token') || localStorage.getItem('alethic_session') || localStorage.getItem('aletnic_admin_token') || ''; }
+    try { return localStorage.getItem('member_platform_session_v1') || ''; }
     catch (_) { return ''; }
   }
   async function api(path, options) {
     const token = bearer();
-    if (!token) throw new Error('请先使用原网页登录，再返回成员事务页。');
+    if (!token) throw new Error('请先使用本内部成员服务登录入口，再返回成员事务页。');
     const opts = options || {};
     let response;
     try {

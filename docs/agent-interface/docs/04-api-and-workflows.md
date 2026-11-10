@@ -4,9 +4,9 @@
 
 ## 共同约定与兼容性
 
-- 应用内部统一 `/api/v1`。公网预期 `/recruitment/api/v1`，由反向代理剥离 `/recruitment`；不能在 router 再加一遍。
-- 保留 `/api/auth/*`、`/api/campaigns/*`、旧招新报名、机试、评审和 exam_kit API。新的组织事务申请不是旧招新 `application`，不能混用列表、权限或保留期。
-- 网页复用原有不透明 Bearer session，不改成 Cookie、不宣称 OAuth/OIDC。CLI 使用独立、短时、可撤销 grant，不能复制网页 token。
+- 成员服务根示例 `http://localhost:8902`，内部统一 `/api/v1`，完整 API 根为 `http://localhost:8902/api/v1`；CLI base 只填服务根。不再预期成员 `/recruitment` 反代，公网部署另审，API 名不改。
+- 招新 `/api/auth/*`、`/api/campaigns/*`、机试/评审与 exam-kit 合约只由根考试服务保留，不挂载到成员应用。新的组织事务不是招新 `application`，不能混用库、列表、权限或保留期。
+- 网页沿用不透明 Bearer session 的技术机制，但账号、DB、session 仅属独立成员服务，不复用考试 token；不改称 Cookie 或 OAuth/OIDC。CLI 使用本成员库内独立、短时、可撤销 grant，不能复制网页 token。
 - `require_org_identity(request, scope=None, web_only=False)` 每次检查当前 `account.role`；只有 `member/admin` 是组织成员，`applicant` 无组织权限。内部身份字段为 `student_id, role, principal_id, auth_type, scopes`；外部默认不返回学号或完整成员档案。
 - 网页管理操作必须同时 `web_only=True` 和当前 `role == 'admin'`，CLI grant 即使由管理员创建也不继承评审权限。
 - 项目、知识检索、申请和 grant 列表统一 `{items, next_cursor}`；使用有界 `limit` 与不透明 `cursor`，结束时 `next_cursor: null`。能力集合和表单字段数组不是列表分页端点。

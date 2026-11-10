@@ -1,81 +1,55 @@
-# Alethic Insight · Agent-Native 组织信息接口体系
+# Alethic Insight · 内部成员平台接口体系
 
-> 设计与实施文档 v1.0｜2026-10-27｜**设计稿，尚未部署；先读 [00 · 现有系统核实与方案评审](docs/00-current-system-review.md)**
->
-> 适用：Alethic Insight Lab 内部成员、平台维护者与 Coding Agent。
-> 主旨：**统一协作契约，不统一个人工作方式。**
+面向认证内部成员的知识、项目与事务接口。网页、REST、CLI 和个人 Agent 可采用不同工具，但使用同一成员业务契约；不是公众聊天 AI、自动经营组织或自主审批系统。
 
-## 一句话定位
+内部成员平台与招新筛选是独立产品。原“在招新平台上增量扩展、共享账号与 DB”方案已撤销。第一阶段先同仓 `member-platform/server/` 与 `member-platform/infra/interface/alethicinsight-cli/` 独立运行，根 `server/` 仅考试；不是最终分仓。基线 `229e69c` 实际尚共库/账号/启动，代码隔离及双服务验证是 PR 门禁，文档本身不证明已完成。
 
-在现有组织官网身份体系与自托管平台之上，提供一套**成员认证、权限控制、API-first、CLI/Bash/MCP 友好**的组织信息与事务接口。成员可以选择网页、命令行、自己熟悉的 Coding/通用 Agent，或可选的官网内置轻量 DeepSeek Agent，完成查询、填表、申请与状态查询。
+## 使用入口
 
-**不是**对外开放的公共聊天 AI；**不是**自动经营社团的管理智能体；**不是**代码生成、科研规划或自主调动成员的 Agent 平台。
+- [成员平台安装与启动](../../member-platform/README.md)
+- [CLI/MCP 同包安装](../../member-platform/infra/README.md)
+- [本地完整运行手册](../AGENT_INTERFACE_MVP.md)
 
-## 已由讨论确立的设计原则（事实/决策）
+成员本地服务根显式使用 `http://localhost:8902`，CLI base 不含 `/api/v1`，不再使用考试 `/recruitment`。网页登录和 CLI grant 都属于成员独立账号/DB，不继承考试管理员权限。CLI/MCP 只查询/准备草稿，正式提交由本人在可信网页核对确认，review 由本产品网页当前 admin 执行。
 
-1. 服务对象仅为**通过认证的内部成员**；官网公开信息及公开学习仓库可以保持开放，但不为公众提供付费 Agent。
-2. **API 是业务能力的唯一逻辑入口**；网页、CLI、MCP、个人 Agent 和可选 DeepSeek 助手均调用同一后端业务服务。
-3. **Bring Your Own Agent（BYOA）**：尊重成员既有工作习惯及模型选择，组织不承担个人 Agent 的模型推理成本。
-4. 独立维护**入口、使用方式/工具适配、业务内容**。采用模块化单体即可实现低耦合，不追求微服务数量。
-5. Agent 以自然语言降低组织办事摩擦：查制度、查项目与资源、填表/申请、查申请状态；不需要写代码或主动安排人员。
-6. 现有代码与部署文档显示静态官网、云端 edge、lab authoritative 的混合链路；N5095 / 4 GB RAM / 512 GB SSD 是 lab 侧设计约束而非已验证容量。轻量业务优先复用现有 FastAPI + SQLite，Gitea 是否部署与容量均待实测；推理由远程 API 承担。
-7. 已使用 GitHub，自托管 Gitea 为可选集成；每个代码仓库需要**明确权威写入源**，镜像仅为同步而非双主。
-8. 原先的三层 Agent 上下文仍然适用：L1 身份/基本规则/Skill 索引；L2 按需发现 Skill、工具与文档；L3 读取具体信息及 metadata。它是上下文发现机制，**不是**权限边界。
-9. 可选官网内置模型首选低成本 DeepSeek Flash 类服务；历史讨论中的 **¥2/人** 仅是经验预算量级，**周期、余额规则、当前 API 单价尚未确认**，不得作为已上线制度。
+## 设计原则
 
-## 还未决定（不能让 Agent 自行假定）
+1. 仅服务认证内部成员，scope 与资源 ACL 逐请求验证；公开入口不等于匿名可访问内部数据。
+2. API 是业务能力逻辑入口；网页、CLI/MCP 都不能绕过服务端规则或直接读 DB。
+3. BYOA：成员自行选择并承担个人模型费用；没有模型也能查询、填表与办理事务。
+4. 成员产品内部可采用 FastAPI/SQLite 模块化单体，但不能与考试共库/身份/生命周期。技术复用不等于共享运行状态。
+5. Skill L1/L2/L3 只是上下文发现，不是鉴权。资料、搜索摘要与原文同权限，成员可见不自动等于可外发给模型。
+6. Gitea、设备/资源、官网模型、OAuth/OIDC 和远程 MCP 是后续方案，不是本次交付。N5095/4GB/512GB 是历史设计约束而非实测容量；历史 ¥2/人预算未确认周期/单价，不是已上线制度。
 
-- 正式成员资格/项目 ACL 的权威规则、首批项目/资源/申请的真实流程；现有 `account.role` 不能代替这些决策。
-- Gitea 的部署状态与具体域名、GitHub/Gitea 的主仓策略和私有仓访问方式。
-- 首批纳入的表单种类、审批责任人、必填字段、权限范围。
-- API 的入口域名、是否公网可连接或经私有网络访问，以及是否先做远程 MCP。
-- 内部数据分类与个人 Agent 外部模型使用政策；备份存放位置及可靠性目标。
+## 文档目录
 
-以上待决策点详见 `docs/10-decision-register.md`。
+| 文档 | 作用 |
+| --- | --- |
+| [00 · 现状与历史审查](docs/00-current-system-review.md) | 旧审查事实、撤销方案与新边界 |
+| [01 · 产品与用户故事](docs/01-product-and-user-stories.md) | 价值、范围与长期场景 |
+| [02 · 架构](docs/02-architecture.md) | 成员产品内部各层与独立产品边界 |
+| [03 · 认证](docs/03-auth-and-permissions.md) | 当前 grant 与未来 OAuth 的区别 |
+| [04 · API 与工作流](docs/04-api-and-workflows.md) | 当前成员契约与可信网页确认 |
+| [05 · CLI/MCP/Skill](docs/05-cli-mcp-skills.md) | 同包适配、命令与安全限制 |
+| [06 · 数据模型/集成](docs/06-data-model-and-integrations.md) | 独立成员 DB、逻辑模型与未来集成 |
+| [07 · 运维方案](docs/07-deployment-ops.md) | 未执行的成员部署、备份/恢复设计 |
+| [08 · 安全隐私](docs/08-security-privacy.md) | 威胁模型与外部 Agent 数据界限 |
+| [09 · 验收](docs/09-roadmap-and-acceptance.md) | 第一阶段隔离及后续上线门禁 |
+| [10 · 决策](docs/10-decision-register.md) | 固定边界与未决事项 |
+| [11 · Coding Agent 交接](docs/11-agent-handoff.md) | 防止继续按旧增量方案实施 |
+| [12 · 参考标准](docs/12-references-and-compatibility.md) | 历史查阅与兼容性限制 |
+| [OpenAPI](contracts/openapi-skeleton.yaml) | 人工维护成员契约，需对照运行时 |
+| [org-access Skill](skills/org-access/SKILL.md) | 薄工作流，不含凭据或实时数据 |
+| [CLI 示例](examples/cli-usage.md) | 本地授权/查询/草稿，不代表生产验证 |
 
-## 文档目录与阅读顺序
+## 最小旅程与待办
 
-| 文件 | 职责 | 读者 |
-|---|---|---|
-| `docs/00-current-system-review.md` | 现状证据、评审结论、上线前安全门禁 | 全体维护者，先读 |
-| `docs/01-product-and-user-stories.md` | 价值、范围、真实场景、角色 | 全体成员、需求负责人 |
-| `docs/02-architecture.md` | 三层结构、系统边界、事实来源、失败降级 | 架构/后端 |
-| `docs/03-auth-and-permissions.md` | CLI 认证、成员授权、作用域、确认机制 | 后端/安全 |
-| `docs/04-api-and-workflows.md` | API 资源、流程、错误及幂等契约 | 后端/前端/CLI |
-| `docs/05-cli-mcp-skills.md` | Bash/JSON/本地 MCP、Skill 三层发现 | Agent/工具开发 |
-| `docs/06-data-model-and-integrations.md` | 数据模型、GitHub/Gitea、文档与元数据 | 数据/后端 |
-| `docs/07-deployment-ops.md` | N5095 部署资源、备份、监控、恢复 | 运维 |
-| `docs/08-security-privacy.md` | 威胁模型、外部 Agent 数据界限、审计 | 安全/审核 |
-| `docs/09-roadmap-and-acceptance.md` | MVP 分期、依赖、验证/上线清单 | Coding Agent/项目负责人 |
-| `docs/10-decision-register.md` | 待确认事项、推荐默认值、决策记录 | 项目负责人 |
-| `docs/11-agent-handoff.md` | 可复制的 Coding Agent 交付指令、PR 切分 | Coding Agent |
-| `contracts/openapi-skeleton.yaml` | 非生产级 OpenAPI 契约起点 | 后端/客户端 |
-| `skills/org-access/SKILL.md` | 可移植的组织访问 Skill 示例 | Agent 用户 |
-| `examples/cli-usage.md` | 成员 CLI 使用体验草案 | 成员/测试 |
+成员在 Agent 外完成 CLI 授权，查询可见项目和制度，按 schema 准备草稿，本人在可信成员网页最终核对与提交，负责人网页审核，本人查询状态。审批与资源资格不能由 Agent 自己推断。
 
-## 最小用户旅程
+真实成员维护/退出负责人、首批项目与审批制度、来源许可、允许外发的数据分级、生产网络/域名、备份目标及 RPO/RTO 都须负责人确认。真实浏览器/两种 Agent、POSIX、硬件、恢复与生产分别验收，不能由协议测试代替。
 
-1. 成员 `alethicinsight-cli auth login`，经官网身份验证并对 CLI 授权。
-2. 在终端运行 `alethicinsight-cli projects list --json`，或由 Host 启动同包的 `alethicinsight-mcp --cli alethicinsight-cli` 调用受限工具。
-3. 成员选择项目，Agent 读取 `project-join` 表单并生成**待确认草稿**；设备借用等表单仍为后续设计，不是当前可执行流程。
-4. 成员在可信网页核对并最终提交；CLI/MCP 只能准备草稿。平台校验身份、权限、项目和必填字段，记录审计信息。
-5. 审批由有权的实际负责人完成；成员通过 UI/CLI/Agent 查询状态。
-6. 即使模型 API 断连，网页表单与 CLI/REST 仍可使用。
+## 仓库与历史
 
-## 不属于本项目
+公共上手归 `open-onboarding`，学习索引归 `awesome-ai`，正式制度引用 `governance-public`，私有运维归 `infra-handoff`。CLI 与 stdio MCP 同一个 `alethicinsight-cli` 发行包/版本，归成员 infra，不另建 MCP 仓。已独立的 exam-kit 不属于成员产品；Frontend-Templates 完全不改。
 
-- 公共匿名 Agent、社交聊天、通用代码补全、Agent 自主跨项目调岗、自动批准资源申请、替代 GitHub/Gitea 的代码评审或 CI、无人确认的写操作。
-- 把全部成员资料、私有仓库或会议纪要原文批量送进第三方模型；把授权 Token 放进模型上下文。
-
-## 仓库边界
-
-- `open-onboarding`：公开的学习、协作和 Agent 接入说明，不存内部凭据/真实成员记录。
-- `awesome-ai`：学习材料索引，不管理社团申请。
-- `governance-public`：公开的正式组织章程与规则；本平台从中引用，不自动创造规则。
-- infra：公共业务基础设施与接口；CLI/MCP 统一位于 `infra/interface/alethicinsight-cli/`，单仓单发行包单版本，发行名 `alethicinsight-cli`，入口为 `alethicinsight-cli` / `alethicinsight-mcp`。不另建 MCP 仓，不以本次整理为由拆分 exam-kit。
-- `infra-handoff`：仅私有运维资料，不存公共接口源码；真实凭据、成员记录、考生数据不进入公共仓。
-- `Alethic-Insight-Frontend-Templates`：本次完全不改；`E:/projects/Aletheion` 仅为历史来源，不作为 monorepo。
-
-详见[仓库边界](../REPOSITORY_BOUNDARIES.md)与[工作区迁移清单](../WORKSPACE_MIGRATION.md)。
-
-> **事实边界：** 本目录保留长期设计，当前可执行命令与限制以 [MVP 手册](../AGENT_INTERFACE_MVP.md)及 [CLI/MCP 说明](docs/05-cli-mcp-skills.md)为准。未部署生产，真实 Agent Host 兼容性需要单独验证。
+当前远端 `alethicinsight-platform` 是历史误改名，本次不重命名、不编造新仓 URL。第一阶段 PR 审查后才决定独立仓映射；不生产部署、不读秘密、不迁移真实数据。参见[产品边界](../REPOSITORY_BOUNDARIES.md)、[历史记录](../migration.md)和[工作区保全](../WORKSPACE_MIGRATION.md)。

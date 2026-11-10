@@ -1,34 +1,45 @@
-# 仓库职责与公开边界
+# 产品职责、仓库布局与公开边界
 
-本页记录已确定的整理边界，不授权迁移目录、创建远程仓库、推送或生产部署。工作区操作按[迁移清单](WORKSPACE_MIGRATION.md)另行人工执行。
+## 两个独立产品，第一阶段同仓隔离
 
-## 公共接口归 infra
+内部成员平台与招新筛选不是一个产品。已撤销“在招新平台上增量扩展成员事务、共享账号和数据库”的方案。共同基线 `229e69c` 的组织接口实际与考试共用 DB、账号和启动流程；本页是隔离 PR 的审查边界，不是只改目录名便已解耦的声明。
 
-- CLI 与本地 stdio MCP 同属 infra 的公共接口，不属于私有运维交接材料。
-- 统一路径：`infra/interface/alethicinsight-cli/`。单仓、单发行包、单版本，正式发行名 `alethicinsight-cli`；命令入口为 `alethicinsight-cli` 与 `alethicinsight-mcp`。
-- 不保留两个顶层产品目录，不新建独立 MCP 仓，不分别发布两套版本。协议适配与命令入口可以在包内模块隔离。
-- 共享稳定 REST 契约，MCP 调用同包 CLI；客户端不得直接读业务数据库。既有 `/api/v1/auth/cli/*` 授权 API 路由不因产品改名而变更。
-- 新客户端配置使用 `ALETHICINSIGHT_API_BASE_URL`、`ALETHICINSIGHT_CONFIG_DIR`。旧 `ALETHIC_API_BASE_URL`、`ALETHIC_BASE_URL`、`ALETHIC_CONFIG_DIR` 仅作兼容别名，不在新示例中推荐；服务端现有 `ALE_THIC_*` 配置不在本次客户端重命名范围。
-- 查询、校验与草稿可经 CLI/MCP；正式提交只能由成员在可信网页核对确认。CLI/MCP 不授予管理员审批能力，不替代服务端成员资格、scope 和资源 ACL 校验。
+| 位置 | 职责 | 运行边界 |
+| --- | --- | --- |
+| 根 `server/` | 招新报名、问卷、考试、评审、交卷与归档 | 自己的进程、考试 DB、考生/管理账号、会话、配置与生命周期；不挂载组织业务 |
+| `member-platform/server/` | 内部成员、项目、知识与事务 | 自己的进程、成员 DB、账号、网页会话、grant 与权限；不加载考试任务/数据 |
+| `member-platform/infra/interface/alethicinsight-cli/` | 内部产品 CLI 与本地 stdio MCP | 同包同版本，通过成员 REST，不直接读 DB |
+| `docs/agent-interface/` | 成员产品设计、契约与安全约束 | 不再指示在根考试服务中新增组织接口 |
+| 独立 [recruitment-exam-kit](https://github.com/CUMT-Alethic-Insight-Lab/recruitment-exam-kit) | 考生本地机试、清洗、LAN 接收机、安装器 | 已有独立源码权威，不恢复本仓 `exam_kit/` |
+
+上述是第一阶段同仓布局，不是最终分仓。先完成隔离代码、双进程空库/合成账号测试、契约与安装验证，提交 PR 审查；再决定独立仓映射与远端名。`alethicinsight-platform` 是历史误改名，这次不重命名、不编造新仓 URL。生产部署、真实成员账号/记录迁移均未执行，且不是文档变更可以证明的事。
+
+## 内部 infra 的接口边界
+
+- CLI/MCP 正式发行名 `alethicinsight-cli`，入口 `alethicinsight-cli` 与 `alethicinsight-mcp`。单发行包、单版本，不另建 MCP 仓。
+- API 名保持 `/api/v1/auth/cli/*`、项目/知识/申请等现有契约，不以代码移动为由改名。显式成员服务根例为 `http://localhost:8902`，CLI base 不含 `/api/v1`，不使用考试 `/recruitment`。
+- 新客户端变量 `ALETHICINSIGHT_API_BASE_URL`、`ALETHICINSIGHT_CONFIG_DIR`；旧 `ALETHIC_API_BASE_URL`、`ALETHIC_BASE_URL`、`ALETHIC_CONFIG_DIR` 只兼容。相同变量名不意味着可以复用两个产品的配置值或凭据。
+- 查询、校验、草稿可经 CLI/MCP；正式提交在可信成员网页确认。当前成员资格、scope、资源 ACL 逐请求检查；CLI 不继承管理员 review 权限。考试管理员也不自动成为成员平台管理员。
 
 ## 私有资料与业务数据
 
 | 位置/仓库 | 职责 | 禁止事项 |
-|---|---|---|
-| infra 公共代码与接口文档 | 可审查的实现、协议、合成夹具、本地脱敏示例 | 不存真实凭据、成员数据、考生记录、私有主机清单或生产日志 |
-| `infra-handoff` | 私有运维交接：主机/账号信息、密钥位置、访问与恢复流程、排障记录 | 不承载公共 CLI/MCP 产品源码或成为其发行源 |
-| `question-bank` | 私有真实题库与解析 | 不将真实试题复制进公共测试夹具 |
-| `exam-archive` | 受控考生活档与附件 | 清洗件仍可能含个人信息，不因“已清洗”而公开 |
-| `governance-public` | 已审核公开章程与规则 | 不由 Agent 对话自行改写制度 |
-| `open-onboarding` / `awesome-ai` | 公开上手说明与学习索引 | 不保存成员权限、内部事务或凭据 |
+| --- | --- | --- |
+| 成员 infra 公共源码/契约 | 可审查实现、合成夹具、本地脱敏示例 | 不存凭据、成员/考生资料、生产日志 |
+| `infra-handoff` | 私有运维交接、主机/账号与恢复说明 | 不承载 CLI/MCP 产品源码，不把私有仓当明文密钥库 |
+| `question-bank` | 私有真实题库与解析 | 不复制到公共测试夹具 |
+| `exam-archive` | 受控考生清洗件和附件 | 清洗不等于公开授权 |
+| `recruitment-materials` | 受控招新物料 | 不随源码隔离公开真实材料 |
+| `governance-public` | 已审核公开章程与规则 | Agent 不能自行改写制度 |
+| `open-onboarding` / `awesome-ai` | 公开上手与学习索引 | 不保存成员权限和凭据 |
 
-凭据应留在受控秘密管理位置；私有仓也不是把明文密钥提交 Git 的理由。数据库、WAL、上传、会话、备份、截图和日志须按真实数据处理，不因目录改名或复制而降低保护等级。公开前审查内容及历史，发现泄密先停公开并由负责人处理撤销/轮换；不要靠删除当前文件宣称历史已净化。
+数据库/WAL、上传、会话、备份、截图与日志按真实数据保护，移动目录不能降低保护等级。公开前审查内容及历史；发现泄密先停止公开并由负责人撤销/轮换，不能删除当前文件便宣称历史净化。本次不读取秘密、不迁移真实账号或 DB。
 
-## 本次不改的边界
+## 工作区与排除项
 
-- `Alethic-Insight-Frontend-Templates` 完全不碰：不编辑、不移动、不调整仓库职责。
-- `E:/projects/Aletheion` 仅为历史来源，不作为 monorepo；其中可复用材料也需单独确认来源、许可、提交状态和敏感性。
-- 平台保留 `server/`、整个 `infra/interface/alethicinsight-cli/` 与组织接口；考生端已独立至公共 [recruitment-exam-kit](https://github.com/CUMT-Alethic-Insight-Lab/recruitment-exam-kit)，平台不再跟踪 `exam_kit/`。私有招新物料归已发布的 `recruitment-materials`，各项目保留 README。本次不修改新 kit 仓、不迁移真实数据、不部署生产；源码验证不代表完整安装器已重建。
-- P: / E: 本地位置不等于远程仓库职责。先保护未提交与未跟踪内容，再确定目标仓和工作副本；不直接合并整个历史目录。
+- `Alethic-Insight-Frontend-Templates` 完全不碰，不编辑、移动或调整职责。
+- `E:/projects/Aletheion` 仅为历史来源，不作为 monorepo；不批量搬入历史目录。
+- 不触碰原脏主仓，不覆盖不同 HEAD 的副本；不用 reset/clean 消除差异。不因 worktree 共享 Git 对象便将它视为完整备份。
+- 本地路径不等于远端产品职责；第一阶段之后才审议独立仓/远端映射。详见[工作区保全](WORKSPACE_MIGRATION.md)。
 
-相关入口：[根 README](../README.md)、[本地 MVP 手册](AGENT_INTERFACE_MVP.md)、[接口架构](agent-interface/docs/02-architecture.md)。
+相关入口：[根 README](../README.md)、[成员平台](../member-platform/README.md)、[运行手册](AGENT_INTERFACE_MVP.md)、[历史与迁移门禁](migration.md)。

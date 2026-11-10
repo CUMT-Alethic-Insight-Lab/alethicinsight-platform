@@ -1,79 +1,50 @@
 # 00 · 现有系统核实与方案评审
 
-> 核实日期：2026-10-27。范围是 `recruitment-exam-platform` 的 `main`（`d3eaf37`）、组织公开仓库清单及公开制度。未读取生产数据库、密钥或私有运维正文，未进行线上写入或入侵式验证。
->
-> 本文件只确认代码和仓库中可见的事实；不能证明生产环境已经部署同一版本。本地未提交的成员资料改动不是 `main` 的既有能力，不能作为本方案的已实现前提。
+## 当前结论：撤销旧增量方案
 
-## 结论
+2026-11-04 修订：内部成员平台与招新筛选是独立产品。旧“把招新平台逐步扩展为成员事务平台、复用身份与数据库”结论已撤销，不再作为实施依据。第一阶段同仓 `member-platform/` 独立成员 server 与 infra，根 `server/` 仅考试；不是最终分仓，不改历史误命名远端，不迁移真实账号或部署生产。
 
-方案值得进入设计评审，不建议直接按原顺序开发。正确定位是：**把现有招新平台逐步扩展为成员事务平台，CLI/MCP 只是适配器**。模块化单体、复用身份与数据库、先无模型闭环、最小权限、人工审批、单机优先备份，均符合现有维护能力。
+共同基线 `origin/main = 229e69c` 中，根 `server/app/main.py` 同时挂载考试与组织路由/`/org`，`server/app/db.py` 同一初始化创建账号、考试/组织表，组织鉴权依赖相同账号与网页 session；CLI grant 虽独立于网页 token，仍共用账号、DB 与启动流程。因此**现状不是两个已解耦产品**。必须代码拆离、双空库/进程/合成账号和跨产品凭据拒绝测试，不能只改 README 声称完成。
 
-开始真实 Agent 接入前，应先完成身份撤权、令牌隔离、数据分级和兼容契约四件事。第一期建议只做公开制度检索、成员可见项目目录及一个真实低-risk 表单；不要先做通用知识库、Gitea、远程 MCP 或官网模型。
+当前边界、历史与验证门禁见 [产品职责](../../REPOSITORY_BOUNDARIES.md)、[迁移记录](../../migration.md)、[验收](09-roadmap-and-acceptance.md)。下列历史审查不授权继续共库。
 
-## 已核实的现状
+## 2026-10-27 历史审查事实
 
-| 事项 | 代码/仓库证据 | 对方案的约束 |
-|---|---|---|
-| 后端是 FastAPI + Pydantic，SQLite 持久化 | `server/app/main.py`、`server/app/db.py`、`server/requirements.txt` | 沿用 Python/FastAPI/SQLite；无需另起微服务或第二身份库 |
-| 已有统一账号入口，但不是 OAuth/OIDC Provider | `server/app/routes/auth.py` 的 `/api/auth/login`、`/api/auth/me` | 网页登录存在不等于可安全委托 CLI；需新增授权流程 |
-| 网页与 API 使用不透明 Bearer token，服务端只存 SHA-256 哈希 | `server/app/auth.py`、`server/static/login.html` | 不是 Session Cookie；不能把“防 CSRF”当作唯一网页令牌问题 |
-| token 默认有效期 7 天，存于浏览器 localStorage | `server/app/config.py`、`server/static/js/topbar.js` | CLI 不复用网页 token；网页令牌还需 XSS 防护和生命周期治理 |
-| 账号角色为 admin/member/applicant；管理接口有独立门禁 | `server/app/constants.py`、`server/app/routes/accounts.py` | 角色可复用，但不等于成员资格、项目 ACL 和客户端 scope |
-| 招新 application、评审、面试预约已有独立业务语义 | `server/app/db.py`、`server/app/routes/booking.py` | 新的事务申请不可把招新报名及个人评审数据默认暴露给 Agent |
-| 已有招新批次数据回收；账号和批次不是同一生命周期 | `server/app/maintenance.py` | 新事务、审计和成员资料分别制定保留策略，不能一律继承批次期限 |
-| 部署是静态官网、云端 edge、lab authoritative 的混合链路 | `server/deploy/README.md`、仓库根 README | 不是“所有服务都在一台 N5095”；写入权威与故障降级要单独设计 |
-| 官网源码在独立 `website` 仓，平台源码在本仓 | 组织仓库清单及两仓 README | 不在此 PR 中重写官网或假定 Pages 路由已经覆盖新 API |
-| 正式成员及 AI 辅助规则在 `governance-public` | `docs/zh-CN/membership.md`、`ai-assistance-policy.md` | 组织接口引用正式制度，不在示例 Skill 中创造规则 |
-| Gitea、硬件实测、真实项目/设备流程 | 本次没有可核实证据 | 继续标记 UNKNOWN；不声称已安装、可承载或已有库存 |
+原范围为 `recruitment-exam-platform` main `d3eaf37`、组织公开仓库清单与制度。未读取生产 DB、密钥或私有运维正文，未做线上写入/入侵式验证；本地未提交成员资料不能当作 main 能力，源码不能证明生产已部署同版。
 
-## 上线前必须修复的身份问题
+| 当时事实 | 当时证据 | 当前解释 |
+| --- | --- | --- |
+| FastAPI/Pydantic/SQLite | 根 `server/app/main.py`、`db.py`、`requirements.txt` | 技术可沿用，不沿用考试账号/DB |
+| 统一 `/api/auth/login`、`/me`，不是 OAuth/OIDC | 根 `server/app/routes/auth.py` | 网页登录不是 CLI 委托；成员服务需自己的最小登录 |
+| 网页不透明 Bearer，服务端 SHA-256 哈希 | 根 `server/app/auth.py`、`static/login.html` | 不是 Session Cookie；成员可复用机制，不复用考试 token |
+| 默认 7 天 token、localStorage | 根 `server/app/config.py`、`static/js/topbar.js` | 历史默认不是未来生产安全参数，仍需 XSS/生命周期治理 |
+| admin/member/applicant 与管理门禁 | 根 `server/app/constants.py`、`routes/accounts.py` | 相同角色名不代表跨产品权限，也不代替 scope/项目 ACL |
+| 招新 application、评审、面试预约已有语义 | 根 `server/app/db.py`、`routes/booking.py` | 成员事务不得读取或混用招新个人评审资料 |
+| 批次数据回收与账号生命周期不同 | 根 `server/app/maintenance.py` | 成员独立保留策略，不运行考试回收/归档任务 |
+| 静态官网、云 edge、lab authoritative 混合部署 | 根考试部署说明与旧 README | 不是全部都在一台 N5095；更不是成员部署既成事实 |
+| 官网源在独立 `website` | 当时公开仓清单与 README | 不重写官网、不假定 Pages 已覆盖成员 API |
+| 正式制度来源 `governance-public` | 当时公开 membership/AI 政策 | Skill/示例不能创造成员制度 |
+| Gitea、硬件实测、真实设备/项目流程无证据 | 当时未核实 | UNKNOWN，不声称已安装或有库存 |
 
-### 1. 角色变更与旧会话之间存在撤权缺口
+## 历史身份问题与必须保留的修复
 
-基线 `d3eaf37` 的 `require_admin_session()` 只检查 session kind 和 `pw_changed`，`set_role()` 也不撤销旧 session，管理员降级后旧 admin session 可能继续通过门禁。本 PR 已同步修复：`set_role()` 在实际角色变化时撤销该账号全部会话，管理门禁同时重新检查当前 `account.role`；`test_role_change_revokes_sessions_and_rechecks_current_role` 覆盖降级和遗留会话两条路径。
+`d3eaf37` 的 `require_admin_session()` 只检查 session kind/pw_changed，`set_role()` 不撤销旧 session，存在降级后旧管理员会话保权缺口。原 PR 修复为角色变化撤销全部会话、管理门禁重新检查当前 `account.role`，并以 `test_role_change_revokes_sessions_and_rechecks_current_role` 覆盖降级及遗留会话。此为历史实现事实，不是本次重新运行测试的声明。
 
-成员资格、项目 ACL 与未来的客户端 grant 仍需同样的实时撤权语义。session 中的 `kind` 只是登录时快照，`require_applicant()` 与普通 `/api/auth/me` 不能代替统一的成员状态检查；这些后续边界不能因管理员角色修复而视为全部完成。
+两套产品都须保留当前角色/账号检查与撤权，成员资格/项目 ACL/CLI grant 同样逐请求生效，不能因已修管理员角色便认为所有边界完成。降级、退出、禁用、重置密码、项目撤权及 grant 撤销需要各自回归。
 
-**最低要求：**
+网页 session 不能变成 Agent 凭据；原网页 token 无客户端 scope/audience 等委托语义。成员 CLI 使用一次性 code 交换短时、只读默认、可撤销 grant，不继承 admin review。localStorage/XSS 风险仍需安全渲染、CSP、编码与审计，不靠“不是 Cookie”忽略。
 
-- 每次受保护请求根据当前账号状态、角色/成员资格、客户端授权和资源 ACL 计算权限，不能信任登录时的角色快照。
-- 降级、退出、禁用、重置密码立即撤销或无效化相关会话；权限收窄不需要等待 token 自然过期。
-- 用管理员降级、成员退出、项目撤权、重置密码、已撤销客户端五类用例覆盖所有新旧入口。
+## 仍有效的契约与安全约束
 
-### 2. 网页会话不能直接变成 Agent 凭据
+1. `/api/v1` 成员 API 名不变，但只挂载独立成员进程；旧考试 `/api/auth/*`、`/api/campaigns/*` 兼容留在考试进程，不能破坏 exam-kit。
+2. 成员 Application 是项目加入事务，不是招新报名；招新问卷/成绩/评语/联系方式默认 restricted，不进通用知识/CLI/MCP。
+3. `profile:read:self` 只最小身份，不默认输出学号、手机号、出生年月、政治面貌等；主体响应用稳定不可枚举 ID。
+4. 表单带来源/revision/更新时间，申请绑定规范化摘要；变更内容/版本要重新确认。服务端不能从 CLI `--confirm` 判断人类在场，最终确认在可信成员网页。
+5. 成员错误 envelope/request_id、验证/429/Retry-After 与分页需契约回归，不声称旧考试 `{detail: ...}` 全部已迁移。
+6. 幂等按 principal + operation + 请求摘要隔离，同键异请求冲突，处理确认消费和合法重放，防止重试重复申请。
+7. 搜索摘要/原文/缓存/导出同 ACL；CLI 输出可能转交外部模型，restricted 不靠 prompt 保密。
+8. 外部同步有界/超时，不在事务请求中阻塞网络；知识从经审核公开制度起步，不索引私聊或全量私有代码。
 
-现有 token 没有 audience、client_id、device 或 scope。把它交给 CLI/MCP 会使适配器继承网页全部能力，并可能继承管理权限。网页 token 与 Agent token 必须按客户端类型隔离，Agent 默认只读、短时、可撤销，管理/评审 scope 不进入普通 BYOA 客户端。
+## 未验证与后续
 
-localStorage 不是 OAuth 问题，但会让 XSS 直接取得 bearer token。新的成员内容、Markdown、个人主页链接和文档索引都应视为 XSS 输入面，采用安全渲染、CSP、输出编码及依赖审计；不要仅靠 HttpOnly Cookie 或“页面没有富文本”作假设。
-
-## 契约与数据边界修订
-
-1. `/api/v1` 是新的成员事务命名空间；保留 `/api/auth/*`、`/api/campaigns/*` 等旧接口给现有网页和 exam_kit。先做适配和契约测试，不能一次性改名破坏考生端。
-2. 新 `Application` 表示项目加入/资源事务，不等于招新报名。数据库表、Python 模型、API schema 命名要消除歧义；招新问卷、成绩、面试评语和联系方式默认 `restricted`，不得通过通用 CLI/MCP 返回。
-3. `profile:read:self` 只返回最小身份和展示字段，不默认返回学号、手机号、出生年月、政治面貌等档案。主体内部可沿用学号键，外部响应应使用稳定、不可枚举的 principal id 或明确的最小字段。
-4. 表单定义必须携带 `source_ref`、revision 和更新时间。申请提交必须绑定表单版本和规范化后的内容摘要；确认后内容再变化需重新确认。
-5. FastAPI 默认 `{detail: ...}` 错误与拟议 `ApiError` 并不一致。需统一异常处理、request_id、验证错误、429/Retry-After 和限流响应，再发布 SDK。
-6. 幂等键必须限定在 principal + operation 范围内，并绑定请求摘要；同键不同请求返回冲突。处理中和已完成的结果均须可安全重放。
-7. 服务端不能从 `--confirm` 判断按键的是人还是 Agent。高风险写入首版在可信网页最终确认；一次性确认令牌必须绑定用户、客户端、操作和内容摘要，短期且单次使用。
-
-## 数据与工具的现实约束
-
-- **CLI 不可信地声明“我不是 Agent”。** 任何本地 CLI 输出都可能被脚本转交外部模型。通用 CLI/MCP 的字段和文档默认按“可能离开组织设备”来设计；restricted 数据走受控网页，不靠提示词保密。
-- 检索索引与原文必须执行相同 ACL；撤权要同时影响原文、缓存、搜索摘要和导出。
-- 不因为使用 SQLite 就接受阻塞式外部网络调用。GitHub/Gitea 同步、模型调用和文档索引须超时、有界并隔离于核心事务请求。
-- lab authoritative 的单机故障不会因增加 CLI 而消失。新事务是否沿用该写入拓扑、云端如何暂存、RPO/RTO 及恢复责任人应在 Phase 0 决定并演练。
-- Gitea 是可选集成，不应成为组织查询/申请 MVP 的依赖。镜像只同步指定 refs，公开仓与私有仓不做未经审查的全量双向同步。
-
-## 建议的第一期
-
-1. 修复撤权缺口并补完整回归测试；区分网页 session 与 CLI client grant。
-2. 选一个真实、字段少、审批人明确的低-risk 事务，先 Web 闭环，再 REST，再 CLI。
-3. 文档检索从 `governance-public` 的公开制度和明确批准的成员文档开始，不索引招新、评审或完整私有代码。
-4. 只读 Agent 工具稳定后再开放申请写入；写操作最终确认落在可信网页。
-5. Gitea、远程 MCP、官网内置模型均后置，按真实使用频率和运维能力重新评估。
-
-## 本次未验证
-
-- 未验证生产版本、实际角色变更请求、域名/TLS、主机资源、备份恢复或 Gitea 运行状态。
-- 未验证任何 Agent/MCP 客户端、外部模型价格、真实审批流程或成员试用。
-- 本文件是设计与代码审查，不是安全审计完成证明，也不授权直接部署身份/权限改动。
+本次未验证生产版本、真实成员角色变更、域名/TLS、硬件、备份恢复、Gitea、任何真实 Agent Host/外部模型价格或真实审批流程。先完成独立成员无模型查询/草稿/网页闭环及双服务隔离，再另审生产拓扑、RPO/RTO、正式成员维护与真实数据迁移。OAuth/OIDC、Gitea、远程 MCP、官网模型后置。本页是代码/设计审查，不是安全验收完成证明或生产授权。

@@ -17,6 +17,7 @@ from app import config
 from app.org_auth import require_org_identity
 
 ROOT = Path(__file__).resolve().parents[2]
+CLI_SOURCE = Path(os.environ.get("MEMBER_PLATFORM_TEST_CLI_SOURCE", ROOT / "infra" / "interface" / "alethicinsight-cli"))
 
 
 def call(base, method, path, token=None, body=None, idempotency=None):
@@ -47,12 +48,11 @@ def live_org(tmp_path):
     base = f"http://127.0.0.1:{port}"
     env = dict(os.environ)
     env.update({
-        "ALE_THIC_DB_PATH": str(database),
-        "ALE_THIC_DATA_DIR": str(tmp_path),
-        "ALE_THIC_ROLE": "authoritative",
-        "ALE_THIC_CAPTCHA_ENABLED": "0",
-        "SECRET_KEY": "local-live-e2e-only",
-        "PUBLIC_PREFIX": "",
+        "MEMBER_PLATFORM_DB_PATH": str(database),
+        "MEMBER_PLATFORM_DATA_DIR": str(tmp_path),
+        "MEMBER_PLATFORM_ROLE": "authoritative",
+        "MEMBER_PLATFORM_SECRET_KEY": "local-member-live-e2e-only-unique-key-2026",
+        "MEMBER_PLATFORM_PUBLIC_PREFIX": "",
     })
     subprocess.run(
         [sys.executable, "-c", "from app import db; db.init_db()"],
@@ -69,8 +69,8 @@ def live_org(tmp_path):
                 (student_id, role, role + " display", now, now),
             )
             conn.execute(
-                "INSERT INTO login_session (token_hash,kind,campaign_id,student_id,created_at,expires_at)"
-                " VALUES (?,?,NULL,?,?,'2099-01-01T00:00:00+00:00')",
+                "INSERT INTO login_session (token_hash,kind,student_id,created_at,expires_at)"
+                " VALUES (?,?,?,?,'2099-01-01T00:00:00+00:00')",
                 (hashlib.sha256(tokens[role].encode()).hexdigest(), role, student_id, now),
             )
         conn.execute(
@@ -142,13 +142,13 @@ def test_live_http_cli_mcp_application_flow(live_org, tmp_path):
         "base_url": base, "token": exchanged["token"],
         "expires_at": exchanged["expires_at"], "scopes": scopes,
     }), encoding="utf-8")
-    sys.path.insert(0, str(ROOT / "infra" / "interface" / "alethicinsight-cli"))
+    sys.path.insert(0, str(CLI_SOURCE))
     from alethicinsight_cli.credentials import private_path
     private_path(config_dir, directory=True)
     private_path(config_dir / "credentials.json")
     cli_env = dict(os.environ)
     cli_env.update({
-        "PYTHONPATH": str(ROOT / "infra" / "interface" / "alethicinsight-cli"),
+        "PYTHONPATH": str(CLI_SOURCE),
         "ALETHIC_API_BASE_URL": base,
         "ALETHIC_CONFIG_DIR": str(config_dir),
     })
@@ -203,7 +203,7 @@ def test_live_http_cli_mcp_application_flow(live_org, tmp_path):
     wrapper = work / "cli_wrapper.py"
     wrapper.write_text(
         "import runpy,sys\n"
-        f"sys.path.insert(0,{str(ROOT / 'infra' / 'interface' / 'alethicinsight-cli')!r})\n"
+        f"sys.path.insert(0,{str(CLI_SOURCE)!r})\n"
         "sys.argv[0]='alethicinsight-cli'\n"
         "runpy.run_module('alethicinsight_cli',run_name='__main__')\n",
         encoding="utf-8",
@@ -222,7 +222,7 @@ def test_live_http_cli_mcp_application_flow(live_org, tmp_path):
             "name": "org_search_knowledge", "arguments": {"query": "成员"}}},
     ]
     mcp_env = dict(cli_env)
-    mcp_env["PYTHONPATH"] = str(ROOT / "infra" / "interface" / "alethicinsight-cli")
+    mcp_env["PYTHONPATH"] = str(CLI_SOURCE)
     result = subprocess.run(
         [sys.executable, "-c", launcher], cwd=ROOT, env=mcp_env,
         input="".join(json.dumps(message) + "\n" for message in messages),
@@ -241,6 +241,35 @@ def test_live_http_cli_mcp_application_flow(live_org, tmp_path):
     assert call(base, "POST", "/api/admin/accounts/member-live/role", tokens["admin"],
                 {"role": "applicant"})[0] == 200
     assert cli("projects", "list")[0] == 3
+
+
+def test_live_member_login_password_change_and_reset(live_org):
+    from app import auth
+
+    base, tokens, _ = live_org
+    status, created, _ = call(base, "POST", "/api/admin/accounts", tokens["admin"],
+                              {"student_id": "http-member", "nickname": "Synthetic HTTP member"})
+    assert status == 201
+    salt = call(base, "GET", "/api/auth/salt?student_id=http-member")[1]["salt"]
+    old_hash = auth.compute_client_hash(created["temporary_password"], salt)
+    status, logged_in, _ = call(base, "POST", "/api/auth/login", body={
+        "student_id": "http-member", "client_hash": old_hash})
+    assert status == 200 and logged_in["pw_changed"] is False
+    assert call(base, "GET", "/api/v1/me", logged_in["token"])[0] == 403
+    new_salt = auth.new_salt()
+    assert call(base, "POST", "/api/auth/change_password", logged_in["token"], {
+        "old_client_hash": old_hash, "new_salt": new_salt,
+        "new_client_hash": auth.compute_client_hash("Synthetic#HttpMember2026", new_salt),
+    })[0] == 200
+    assert call(base, "GET", "/api/v1/me", logged_in["token"])[0] == 200
+    rid = secrets.token_urlsafe(24)
+    status, authorization, _ = call(base, "POST", "/api/v1/auth/cli/authorization-requests",
+                                   logged_in["token"], {"request_id": rid})
+    assert status == 200
+    status, reset, _ = call(base, "POST", "/api/admin/accounts/http-member/reset_password", tokens["admin"])
+    assert status == 200 and reset["temporary_password"] != created["temporary_password"]
+    assert call(base, "GET", "/api/auth/me", logged_in["token"])[0] == 401
+    assert call(base, "POST", "/api/v1/auth/cli/token", body={"request_id": rid, "code": authorization["code"]})[0] == 401
 
 
 def test_edge_rejects_org_writes(monkeypatch, tmp_path):
