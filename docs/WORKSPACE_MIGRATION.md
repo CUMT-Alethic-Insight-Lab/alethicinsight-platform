@@ -1,6 +1,6 @@
 # 本地工作区保全与迁移清单
 
-这是从 PR #3 历史人工清单修订的保全门禁，**不是已执行的工作区或真实数据迁移记录**。原方案把组织接口增量并入招新平台、保留根 `infra/`，现已撤销；历史事实见[迁移记录](migration.md)。当前纠正先在同仓 `member-platform/` 独立成员 server 与 infra，根 `server/` 仅考试，PR 审查后才决定独立仓与远端映射。`alethicinsight-platform` 历史误改名本次不纠名，不创建新仓 URL，不动原脏主仓、不读秘密、不部署、不迁移真实账号。以下方框均是操作前门禁，不是完成标记。
+这是从 PR #3 历史人工清单修订的保全门禁，**不是已执行的工作区或真实数据迁移记录**。原组织接口增量并入招新平台的方案已撤销；PR #6 已合并至 `9dc7229`，完成第一阶段同仓隔离。当前已从原 `member-platform/` 子树保留历史准备独立成员仓的本地副本，目标为 [alethicinsight-member-platform](https://github.com/CUMT-Alethic-Insight-Lab/alethicinsight-member-platform)；本分支移除考试仓重复源码与详细成员文档，旧 Markdown 路径保留导航。考试仓现名 `alethicinsight-platform` 暂保留，CLI/MCP 同包归成员仓内部 infra，exam-kit 不动。远端发布与验证由负责人执行；**新成员仓发布并验证前，不应合并本拆仓 PR**。不动原脏主仓、不读秘密、不部署、不迁移真实账号。以下方框是操作前门禁，不是完成标记；历史见[迁移记录](migration.md)。
 
 ## 1. 先识别，不先搬家
 
@@ -28,9 +28,11 @@
 - [ ] 如后续需要 worktree，由负责人使用 Git worktree 管理命令并核对共享主仓；现有 worktree 不自行挪位置。本次不执行 worktree move/remove/prune。
 - [ ] 每个 coder 只操作分配的 worktree 与文件范围，按授权提交自己路径，不修改原脏主仓或推送。`feat/agent-interface-mvp` 仅是旧任务分支历史，不是当前隔离执行入口。
 
-## 4. 先隔离验证，再审议仓库映射
+## 4. 独立仓发布与考试仓去重门禁
 
-- [ ] 目标布局书面核对：根 `server/` 仅考试；`member-platform/server/` 独立成员产品与 DB/账号/会话；CLI/MCP 同包归 `member-platform/infra/interface/alethicinsight-cli/`。私有运维归 `infra-handoff`，不建独立 MCP 仓。exam-kit 已独立，不恢复旧目录；先审查同仓隔离 PR，再决定远端/独立仓映射。
+- [ ] 核对当前布局：考试仓 `server/` 仅考试；独立成员仓根 `server/` 为成员产品，`infra/interface/alethicinsight-cli/` 为同包 CLI/MCP。两产品 DB/账号/会话独立。私有运维归 `infra-handoff`，不建独立 MCP 仓；exam-kit 已独立且本次不改，不恢复旧目录。
+- [ ] 发布前审查成员子树提取后的完整历史、公开范围和来源提交映射，不把保留历史当作已脱敏证明；有敏感内容时停止公开，由负责人处理，不在本任务读取秘密。
+- [ ] 负责人完成新成员仓远端发布、独立克隆/安装与文档验证后，再审查合并考试仓去重 PR；目标 URL 存在不是发布验证完成的证据。考试仓仍保留 `9dc7229` 历史来源，不删除原件或旧数据。
 - [ ] 在新目标准备可回退的副本，保留来源，不使用剪切、覆盖或删除作为第一步。先确认空间、私有权限与排除项，不把真实数据复制到公开仓。
 - [ ] 对非敏感源码核验提交历史/HEAD、文件差异、未提交内容恢复情况、依赖与本地链接；检查新路径的打包入口与版本一致性。
 - [ ] 在隔离数据和新临时凭据目录中安装单包，验证 `alethicinsight-cli --help`、`alethicinsight-mcp --help`、项目标准测试，以及 loopback 合成数据 CLI/MCP 闭环；不沿用生产数据库或真实凭据。
@@ -39,4 +41,4 @@
 
 ## 当前执行边界
 
-此清单中的方框均是待执行项，不表示已盘点 P/E、不表示已创建 clone/备份、不表示已移动或切换目录。当前文档检查只能证明本次修改的文档与本地链接，不证明安装、生产发布或真实 Agent Host 兼容性。
+此清单中的方框均为待核验门禁，不表示已盘点 P/E、完成备份或切换目录。上文成员独立本地副本的状态仅限本次明确记录的源码提取，不证明所有工作区已迁移或远端已发布。本仓标准回归为 `python -m pytest server/tests -q`；成员测试、打包与合成闭环由新仓分别验证，不沿用同仓结果作为独立仓验收。文档链接检查不证明安装、生产发布、真实 Agent Host 兼容性或数据迁移。旧成员 API 公网入口继续默认 503，具体部署兼容见[考试部署说明](../server/deploy/README.md)。
