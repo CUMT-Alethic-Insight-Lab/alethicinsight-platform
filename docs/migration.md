@@ -1,5 +1,11 @@
 # 产品边界纠正与历史记录
 
+## 2026-11-17：考试仓名称恢复（已执行）
+
+经用户明确授权，GitHub 仓库已从历史名称 `CUMT-Alethic-Insight-Lab/alethicinsight-platform` 恢复为 [CUMT-Alethic-Insight-Lab/recruitment-exam-platform](https://github.com/CUMT-Alethic-Insight-Lab/recruitment-exam-platform)，本工作树 `origin` 已指向恢复后的 URL。旧 URL 由 GitHub 保留重定向，以下历史阶段中的 `alethicinsight-platform` 叙述仍按当时事实保留；本地保全路径不随远端改名机械替换。
+
+根 `server/` 仅承担考试运行能力，但 `main` 仍保留 `member-platform/` 副本；去重仍待开放的 [PR #7](https://github.com/CUMT-Alethic-Insight-Lab/recruitment-exam-platform/pull/7)（`split/member-platform-extraction`）审查合并，不能声称主分支已去重。名称恢复不改变考试协议或部署命令，也不表示部署、真实数据迁移或 PR 合并已执行。
+
 ## 2026-11-17：独立成员仓提取与考试仓去重
 
 PR #6 已合并，当前纠正分支从 `origin/main = 9dc7229` 开始。第一阶段同仓隔离已完成，上一阶段交接记录为考试 **308**、成员 **128**、CLI **193**；这些是同仓基线的历史通过数，不是本次独立仓复测结果。
@@ -7,7 +13,7 @@ PR #6 已合并，当前纠正分支从 `origin/main = 9dc7229` 开始。第一�
 - 成员源码已在本地从原 `member-platform/` 子树保留历史准备独立仓，目标 URL 为 [alethicinsight-member-platform](https://github.com/CUMT-Alethic-Insight-Lab/alethicinsight-member-platform)。发布、公开历史安全审查与独立仓验证由负责人完成，本文不声称远端已发布。
 - 本分支移除考试仓跟踪的 `member-platform/` 重复源码。来源仍可追溯至本仓 `9dc7229` 历史及独立成员副本；不读取或删除真实数据。
 - 成员详细设计、运行手册、CLI/MCP 示例与 Skill 改为旧 Markdown 路径下的短导航；YAML 契约从考试仓移除，保留契约导航，不再维护两份成员权威。
-- 本仓 `server/` 只承担招新/筛选服务端，当前远端名 `alethicinsight-platform` 暂保留，不擅自重命名。CLI/MCP 仍同包同版本，归新成员仓内部 infra，不另建 MCP 仓、不改命令或 API 名。`recruitment-exam-kit` 保持原状。
+- 本仓 `server/` 只承担招新/筛选服务端，当前远端名已获授权恢复为 [recruitment-exam-platform](https://github.com/CUMT-Alethic-Insight-Lab/recruitment-exam-platform)。CLI/MCP 仍同包同版本，归新成员仓内部 infra，不另建 MCP 仓、不改命令或 API 名。`recruitment-exam-kit` 保持原状。
 - 考试兼容协议与部署命令不变，旧成员 API 公网地址 `/recruitment/api/v1`（含子路径）继续默认 **503（fail closed）**，不回源或回落到考试服务。本次不配置成员生产上游，不执行部署或真实账号迁移。
 
 **新成员仓发布与验证完成前，不应合并本拆仓 PR。** 考试仓须运行 `python -m pytest server/tests -q` 和文档链接检查；成员安装、标准测试、单包 CLI/MCP、HTTP 合成闭环及独立路径文档由成员仓另行验收，不能沿用上述同仓数量替代。工作区与历史公开门禁见[保全清单](WORKSPACE_MIGRATION.md)。

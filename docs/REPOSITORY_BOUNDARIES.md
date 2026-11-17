@@ -2,11 +2,11 @@
 
 ## 当前分仓：招新筛选与内部成员是独立产品
 
-招新筛选服务考生与评审，内部成员平台服务认证成员；不是通用平台的前后阶段。PR #6 已合并（`9dc7229`），第一阶段同仓隔离成为历史基线。本次将原 `member-platform/` 子树保留历史提取到独立成员仓，本分支移除考试仓重复源码；不再把同仓目录当作最终归属。
+招新筛选服务考生与评审，内部成员平台服务认证成员；不是通用平台的前后阶段。PR #6 已合并（`9dc7229`），第一阶段同仓隔离成为历史基线。本次将原 `member-platform/` 子树保留历史提取到独立成员仓，本分支移除考试仓重复源码；不再把同仓目录当作最终归属。`main` 仍保留成员副本，去重待 [PR #7](https://github.com/CUMT-Alethic-Insight-Lab/recruitment-exam-platform/pull/7) 审查合并；仓库名恢复不代表去重已合入。
 
 | 位置/仓库 | 职责 | 运行边界 |
 | --- | --- | --- |
-| 本仓 `alethicinsight-platform` 的 `server/` | 招新报名、问卷、考试、评审、交卷与归档 | 考试进程、DB、考生/管理账号、会话、配置与生命周期；不挂载组织业务。现仓名暂保留，不擅自重命名 |
+| 本仓 [recruitment-exam-platform](https://github.com/CUMT-Alethic-Insight-Lab/recruitment-exam-platform) 的 `server/` | 招新报名、问卷、考试、评审、交卷与归档 | 考试进程、DB、考生/管理账号、会话、配置与生命周期；不挂载组织业务。仓库名已获授权恢复 |
 | 独立 [alethicinsight-member-platform](https://github.com/CUMT-Alethic-Insight-Lab/alethicinsight-member-platform) | 原成员子树的 server、infra 与成员文档 | 独立成员进程、DB、账号、网页会话、grant 与权限；不加载考试任务/数据 |
 | 成员仓 `infra/interface/alethicinsight-cli/` | 内部产品 CLI 与本地 stdio MCP | 同包同版本，通过成员 REST，不直接读 DB，不另建 MCP 仓 |
 | 本仓 `docs/agent-interface/`、`docs/AGENT_INTERFACE_MVP.md` | 旧 URL 的精简兼容导航 | 不维护成员详细设计或 YAML 契约副本，不指示在考试服务新增组织接口 |

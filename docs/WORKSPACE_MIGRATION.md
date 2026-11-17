@@ -1,6 +1,6 @@
 # 本地工作区保全与迁移清单
 
-这是从 PR #3 历史人工清单修订的保全门禁，**不是已执行的工作区或真实数据迁移记录**。原组织接口增量并入招新平台的方案已撤销；PR #6 已合并至 `9dc7229`，完成第一阶段同仓隔离。当前已从原 `member-platform/` 子树保留历史准备独立成员仓的本地副本，目标为 [alethicinsight-member-platform](https://github.com/CUMT-Alethic-Insight-Lab/alethicinsight-member-platform)；本分支移除考试仓重复源码与详细成员文档，旧 Markdown 路径保留导航。考试仓现名 `alethicinsight-platform` 暂保留，CLI/MCP 同包归成员仓内部 infra，exam-kit 不动。远端发布与验证由负责人执行；**新成员仓发布并验证前，不应合并本拆仓 PR**。不动原脏主仓、不读秘密、不部署、不迁移真实账号。以下方框是操作前门禁，不是完成标记；历史见[迁移记录](migration.md)。
+这是从 PR #3 历史人工清单修订的保全门禁，**不是已执行的工作区或真实数据迁移记录**。原组织接口增量并入招新平台的方案已撤销；PR #6 已合并至 `9dc7229`，完成第一阶段同仓隔离。当前已从原 `member-platform/` 子树保留历史准备独立成员仓的本地副本，目标为 [alethicinsight-member-platform](https://github.com/CUMT-Alethic-Insight-Lab/alethicinsight-member-platform)；本分支移除考试仓重复源码与详细成员文档，旧 Markdown 路径保留导航。考试仓名已获授权恢复为 [recruitment-exam-platform](https://github.com/CUMT-Alethic-Insight-Lab/recruitment-exam-platform)；`main` 仍保留成员副本，去重待 [PR #7](https://github.com/CUMT-Alethic-Insight-Lab/recruitment-exam-platform/pull/7) 审查合并，改名不等于去重完成，也不改变本地保全路径。CLI/MCP 同包归成员仓内部 infra，exam-kit 不动。远端发布与验证由负责人执行；**新成员仓发布并验证前，不应合并本拆仓 PR**。不动原脏主仓、不读秘密、不部署、不迁移真实账号。以下方框是操作前门禁，不是完成标记；历史见[迁移记录](migration.md)。
 
 ## 1. 先识别，不先搬家
 

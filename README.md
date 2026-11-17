@@ -4,11 +4,11 @@
 
 | 产品 | 源码权威与用途 |
 | --- | --- |
-| 招新筛选服务端（本仓） | `server/`；当前仓库名 `alethicinsight-platform` 暂时保留，不在本次重命名 |
+| 招新筛选服务端（本仓） | `server/`；仓库名已恢复为 [recruitment-exam-platform](https://github.com/CUMT-Alethic-Insight-Lab/recruitment-exam-platform) |
 | [内部成员平台](https://github.com/CUMT-Alethic-Insight-Lab/alethicinsight-member-platform) | 独立仓库；成员身份、项目、知识、事务申请与可信网页确认。CLI/MCP 同包归其内部 infra，不属于考试客户端 |
 | [recruitment-exam-kit](https://github.com/CUMT-Alethic-Insight-Lab/recruitment-exam-kit) | 已独立的考生端启动器、本地机试服务、会话清洗、LAN 接收机与安装器；本次不修改 |
 
-PR #6 已合并至 `9dc7229`，完成第一阶段同仓隔离。此次从该基线将原 `member-platform/` 子树保留历史提取到独立成员仓，本分支删除考试仓的重复源码，仅保留旧文档路径的兼容导航。**成员新仓发布与验证完成前，不应合并本拆仓 PR。** 独立仓本地准备不等于远端已发布，更不代表生产部署或真实数据迁移。详见[产品边界](docs/REPOSITORY_BOUNDARIES.md)和[迁移记录](docs/migration.md)。
+PR #6 已合并至 `9dc7229`，完成第一阶段同仓隔离。此次从该基线将原 `member-platform/` 子树保留历史提取到独立成员仓，本分支删除考试仓的重复源码，仅保留旧文档路径的兼容导航。**成员新仓发布与验证完成前，不应合并本拆仓 PR。** 独立仓本地准备不等于远端已发布，更不代表生产部署或真实数据迁移。`main` 仍保留成员副本，去重待 [PR #7](https://github.com/CUMT-Alethic-Insight-Lab/recruitment-exam-platform/pull/7) 审查合并，不能把仓库名恢复视作去重完成。旧仓库 URL 由 GitHub 保留重定向；历史名称与恢复记录见[迁移记录](docs/migration.md)，职责见[产品边界](docs/REPOSITORY_BOUNDARIES.md)。
 
 ## 安装与本地启动
 
